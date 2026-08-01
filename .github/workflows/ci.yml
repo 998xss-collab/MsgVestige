@@ -65,7 +65,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --workspace --verbose
-      - run: cargo test --workspace --verbose
+      # `--no-fail-fast`: cargo 默认跑到**第一个失败的测试二进制就停**, 后面的根本没跑到 ——
+      # 首次上 GitHub 时因此连吃四轮, 每轮只暴露一个失败, 修完推上去才看到下一个。
+      # 加上它, 一次把所有失败一起报出来, 别再一轮试一个。
+      - run: cargo test --workspace --verbose --no-fail-fast
 
   # 随包文档的**机械**体检 —— 不查内容对不对, 只查文本层面坏没坏。
   #
