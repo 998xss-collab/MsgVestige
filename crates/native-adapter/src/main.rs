@@ -16,7 +16,11 @@ use native_core::key_provider::{CacheKeyProvider, KeyProvider};
 use native_core::{sha8, AccountDbSource, MasterKey, PipelineStats, PrivacyMode, Wxid};
 
 #[derive(Parser)]
-#[command(name = "msgvestige-adapter", version, about = "微信数据基座 alpha — message ETL ingest")]
+#[command(
+    name = "msgvestige-adapter",
+    version,
+    about = "微信数据基座 alpha — message ETL ingest"
+)]
 #[allow(clippy::struct_excessive_bools)] // CLI flag struct: 19 bool (redact/contacts/chatrooms/sessions/favorites/sns/transfers/red_envelopes/group_pays/friend_verifies/finder_visits/moment_feeds/sns_notifies/emoticons/avatars/biz_messages/bizchat/strangers/no_messages) 是 clap 惯例
 struct Args {
     /// 账号 wxid (如 wxid_abcd1234efgh567)。
