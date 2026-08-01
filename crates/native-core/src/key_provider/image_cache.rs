@@ -200,6 +200,14 @@ mod tests {
     use super::*;
 
     /// store → resolve 往返: 存的 aes/xor 能原样取回 (DPAPI + bincode 闭环)。
+    ///
+    /// ⚠️ **只在 Windows 上跑**(首次上 GitHub、CI 第一次真跑逮到): 这个缓存的加密走 **DPAPI**
+    /// (Windows 的数据保护接口, CURRENT_USER 范围), 非 Windows 上没有这个东西 —— `resolve`
+    /// 取不回来, `.expect("命中")` 当场炸。本地只在 Windows 上跑, 所以从没发现。
+    ///
+    /// 产品本来就只支持 Windows。CI 留 Linux 是为了挡住"**不小心**写进 Windows 专属 API",
+    /// 而这里是**有意**用 Windows 专属 API —— 所以该标平台的是测试, 不是代码。
+    #[cfg(windows)]
     #[test]
     fn store_then_resolve_roundtrip() {
         let tmp = std::env::temp_dir().join(format!("nk_imgcache_{}.enc", std::process::id()));
