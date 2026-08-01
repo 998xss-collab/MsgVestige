@@ -3209,7 +3209,23 @@ pub async fn hot_followups(
 fn validate_source_db_rel(rel: &str) -> Result<()> {
     use std::path::Component;
     let relp = std::path::Path::new(rel);
-    if rel.is_empty()
+
+    // ⚠️ **第一层: 不依赖平台的词法拒绝**(首次上 GitHub、CI 在 Linux 上真跑逮到)。
+    // 下面那层 `Path::components()` 的语义**跟平台走**: Windows 上 `\` 是分隔符、`C:` 是
+    // Prefix, 所以 `..\..\Windows\win.ini` / `C:\Windows\win.ini` 都挡得下; 而 Linux 上这两样
+    // 都只是普通字符, 整串成了**一个 Normal 组件** —— 守卫直接放行。
+    // 这是条安全守卫, 不该"换个平台就漏"。所以先做一层跟 `Path` 无关的:
+    //   · 开头是 `/` 或 `\`  → 根 / UNC(`\\server\share`) / verbatim(`\\?\`) / NT 命名空间(`\??\`)
+    //   · 第二个字节是 `:`   → 盘符, 绝对(`C:\x`)和盘符相对(`C:x`)一起挡
+    //   · 两种分隔符都切开, 任一段等于 `..` → 上级目录(含 `message/../../contact.db`)
+    // **Windows 上行为一个字不变**(这些本来就被下层挡住), 只是 Linux 上从漏变成也拒。
+    let lexical_bad = rel.is_empty()
+        || rel.starts_with('/')
+        || rel.starts_with('\\')
+        || rel.as_bytes().get(1) == Some(&b':')
+        || rel.split(['/', '\\']).any(|seg| seg == "..");
+
+    if lexical_bad
         || relp.is_absolute()
         || relp
             .components()
