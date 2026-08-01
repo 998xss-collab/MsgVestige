@@ -1,0 +1,27 @@
+[package]
+name = "native-sqlcipher"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# key 类型 + SQLCipher 常量复用 (KeyMaterial/KeyKind + PAGE/RESERVE/MAC_SALT_XOR/ROUNDS).
+native-keyscan = { path = "../native-keyscan" }
+# 全页 AES-256-CBC 解密 + passphrase→enc_key 派生 (RustCrypto 一族, 无 C/openssl).
+aes.workspace = true
+cbc.workspace = true
+pbkdf2.workspace = true
+hmac.workspace = true
+sha2.workspace = true
+zeroize.workspace = true
+thiserror.workspace = true
+# 解密后内存 image → deserialize 只读挂载 (不落明文文件): serialize feature 叠加到 workspace bundled.
+rusqlite = { workspace = true, features = ["serialize"] }
+
+[dev-dependencies]
+tempfile.workspace = true

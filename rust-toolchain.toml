@@ -1,0 +1,8 @@
+# Rust toolchain pin
+# 用 stable channel (避免依赖深处需要 edition2024 时 1.83 卡住)
+# alpha 收敛后可以锁具体版本 (推 0.2.0+ KI)
+
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy", "llvm-tools-preview"]
+profile = "default"

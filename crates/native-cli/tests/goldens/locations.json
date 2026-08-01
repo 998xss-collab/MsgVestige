@@ -1,0 +1,20 @@
+{
+  "data": [
+    {
+      "cityname": "上海",
+      "conv_id": "chatA",
+      "create_time": 1100,
+      "label": "上海市黄浦区",
+      "latitude": 31.23041,
+      "longitude": 121.4737,
+      "poiname": "人民广场"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 30,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

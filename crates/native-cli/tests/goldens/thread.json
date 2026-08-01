@@ -1,0 +1,19 @@
+{
+  "data": [
+    {
+      "conv_id": "chatC",
+      "create_time": 2100,
+      "quoted_text": "被引原文",
+      "refer_type": 1,
+      "reply_text": "回复正文",
+      "sender_wxid": "wxid_replier"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 30,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

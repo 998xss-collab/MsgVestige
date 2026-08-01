@@ -1,0 +1,29 @@
+{
+  "data": [
+    {
+      "detail": "应付¥8.00 已付1/2人",
+      "kind": "群收款",
+      "time": 6000,
+      "who": "项目群"
+    },
+    {
+      "detail": "￥10.00",
+      "kind": "转账",
+      "time": 5000,
+      "who": "wxid_payer → wxid_receiver"
+    },
+    {
+      "detail": "类型码0/状态码1 @群红包 (金额本地不存)",
+      "kind": "红包",
+      "time": null,
+      "who": "wxid_sender"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 20,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 3
+  }
+}

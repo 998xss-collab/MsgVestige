@@ -1,0 +1,1547 @@
+{
+  "AccountSummary": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "账号自述汇总: 当前账号 id 加各业务表的行数统计, data 为单元素数组 [row] (字段来源: crates/native-query/src/handwritten.rs 的 account_query (第120-137行) —— 用 serde_json::json! 手建单行, 非 SQL SELECT, JSON 键即 json! 字面键。account_id 由 `SELECT account_id FROM person LIMIT 1` 经 .ok() 得 Option<String> → 可为 null。其余五个计数由 count 闭包 `SELECT count(*) FROM {t}` 经 .unwrap_or(0) 得 i64 → 恒为非空整数 (即便表不存在也返 0, 不报错)。HTTP 层 get_account handler (native-http/src/lib.rs:468) 走 cold → 返回 data=[row] 单元素数组, meta=page(1,1)。此形状不涉及 V3* 表结构体, 类型直接来自 Rust 字面绑定。)",
+    "properties": {
+      "account_id": {
+        "type": "string",
+        "description": "当前账号 wxid (取自 person 表首行 account_id; 空库/无明文行时取不到为 null)",
+        "nullable": true
+      },
+      "persons": {
+        "type": "integer",
+        "description": "person 表行数 (联系人/人物记录总数; 表不存在计 0)"
+      },
+      "chatrooms": {
+        "type": "integer",
+        "description": "chatroom 表行数 (群聊总数; 表不存在计 0)"
+      },
+      "messages": {
+        "type": "integer",
+        "description": "message 表行数 (消息总数; 表不存在计 0)"
+      },
+      "moments": {
+        "type": "integer",
+        "description": "moment 表行数 (朋友圈动态总数; 表不存在计 0)"
+      },
+      "favorites": {
+        "type": "integer",
+        "description": "favorite 表行数 (收藏总数; 表不存在计 0)"
+      }
+    }
+  },
+  "AccountRef": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "账号列表 (/api/v1/accounts) 的一行: 库里一个可命名的账号 (供消费者选 ?account=) (data 数组每个对象只有 account_id 一个键。该键不是来自宽 SELECT: SQL 只 `SELECT DISTINCT account_id FROM person WHERE account_id IS NOT NULL ORDER BY account_id`, 行构造器 (handwritten.rs:149) 直接 `json!({ \\\"account_id\\\": r.get::<_, String>(0)? })` 把它映成单键。三重定死非空: (1) 列 person.account_id 是 TEXT NOT NULL (storage.rs:709); (2) WHERE 过滤 IS NOT NULL; (3) 取值用非 Option 的 String。外层还有 QueryResult 的 {data, meta} 信封 (meta.page(n,n)+source=cold), 但本 schema 只描述 data 数组内每个对象的字段。此端点不 scoped、无分页 offset。)",
+    "properties": {
+      "account_id": {
+        "type": "string",
+        "description": "该账号自己的 wxid 明文 (person.account_id distinct, 非空); 消费者据此传 ?account= 做账号隔离选择"
+      }
+    }
+  },
+  "Person": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一个联系人 (native-core person 表一行)。GET /api/v1/contacts 列表返 5 字段子集; GET /api/v1/contacts/{wxid} 详情走 SELECT * FROM person, 返此全集 45 字段。 (来源链路(逐个核实过): 详情 GET /contacts/{wxid} → get_contact_detail(native-http lib.rs:1897) → inspect_one → native_query::inspect_query(InspectType::Contact)(handwritten.rs:1778) → fetch_row 跑 `SELECT * FROM person WHERE username=?1`(handwritten.rs:1759), 故 data[0] 的键 = person 表全部列; 值经 sql_value_json 由原始 SQLite Value 直转 JSON。列全集权威源 = init_person_table CREATE TABLE(storage.rs:701-770), 对应 V3Person struct(storage.rs:593-660), 共 45 列, 上面即全集。\n\n列表是子集: GET /api/v1/contacts → get_contacts → contacts_query(handwritten.rs:1473) 只 SELECT/投影 5 列, data 每行仅含: username, nick_name, remark, alias, local_type。其余 40 字段仅详情端点有。\n\n类型判定关键点(实测输出为准, 覆盖 bool→boolean 简单规则): person 表里 is_in_chat_room / is_starred / is_collapsed / is_pinned / blocks_moments / hide_their_moments / chat_only / is_muted 这 8 个字段在 V3Person 中是 Rust bool, 但 SQLite 存为 INTEGER, 且 fetch_row 用 sql_value_json 把 Value::Integer 映射成 JSON number → 详情端点线上实际返回整数 0/1 而非 JSON true/false。因此上面这 8 个标为 integer 并在 description 注明\"0/1 标志(底层 bool)\"。若下游 OpenAPI 想按布尔语义标注可自行改回 boolean, 但要知道真实 wire 值是 0/1。\n\nnullable: 按任务要求详情全集字段一律 nullable=true(SELECT * 任意列理论可空, 未回填列返 null 且键仍在)。注意 SELECT * 会返回该库 person 表当时存在的所有列(含 NULL 值列), JSON 对象键按键名字母序排列(inspect_query 注释: \"Map 按键名排序\")。任务给的 14 个实测键(account_id/account_id_sha/alias/alias_len/is_in_chat_room/local_type/nick_name/nick_name_len/remark/remark_len/source/source_native_id/username/username_sha)恰为最早核心列子集, 是在旧 schema 夹具库上观测到的; 已按\"补全\"扩到当前 45 列全集。)",
+    "properties": {
+      "account_id_sha": {
+        "type": "string",
+        "description": "登录账号 id 的 sha256 (主键成员, 标识该行属于哪个微信账号)。",
+        "nullable": true
+      },
+      "source": {
+        "type": "string",
+        "description": "记录来源标签 (如 contact.db 或 contact.db|stranger; 主键成员)。",
+        "nullable": true
+      },
+      "source_native_id": {
+        "type": "string",
+        "description": "原始记录 id (Contact_<md5完整>; 溯源用, 非主键)。",
+        "nullable": true
+      },
+      "username_sha": {
+        "type": "string",
+        "description": "联系人 wxid 的 sha256 (身份键, 主键成员)。",
+        "nullable": true
+      },
+      "account_id": {
+        "type": "string",
+        "description": "登录账号 id (明文)。",
+        "nullable": true
+      },
+      "username": {
+        "type": "string",
+        "description": "联系人 wxid (明文)。",
+        "nullable": true
+      },
+      "nick_name": {
+        "type": "string",
+        "description": "联系人昵称 (明文)。",
+        "nullable": true
+      },
+      "remark": {
+        "type": "string",
+        "description": "备注名 (明文, 可空)。",
+        "nullable": true
+      },
+      "alias": {
+        "type": "string",
+        "description": "微信号/别名 (明文, 可空)。",
+        "nullable": true
+      },
+      "nick_name_len": {
+        "type": "integer",
+        "description": "昵称字符长度 (元数据)。",
+        "nullable": true
+      },
+      "remark_len": {
+        "type": "integer",
+        "description": "备注名字符长度 (元数据)。",
+        "nullable": true
+      },
+      "alias_len": {
+        "type": "integer",
+        "description": "别名字符长度 (元数据)。",
+        "nullable": true
+      },
+      "local_type": {
+        "type": "integer",
+        "description": "联系人本地类型码 (如 1=个人好友, 2=群 等)。",
+        "nullable": true
+      },
+      "is_in_chat_room": {
+        "type": "integer",
+        "description": "是否群内成员的 0/1 标志 (底层 V3Person 为 bool; SELECT * 出线为整数 0/1)。",
+        "nullable": true
+      },
+      "quan_pin": {
+        "type": "string",
+        "description": "昵称全拼 (搜索用, 可空)。",
+        "nullable": true
+      },
+      "pin_yin_initial": {
+        "type": "string",
+        "description": "昵称拼音首字母 (搜索用, 可空)。",
+        "nullable": true
+      },
+      "remark_quan_pin": {
+        "type": "string",
+        "description": "备注名全拼 (搜索用, 可空)。",
+        "nullable": true
+      },
+      "remark_pin_yin_initial": {
+        "type": "string",
+        "description": "备注名拼音首字母 (搜索用, 可空)。",
+        "nullable": true
+      },
+      "verify_flag": {
+        "type": "integer",
+        "description": "认证标志 (如公众号认证; 状态元数据)。",
+        "nullable": true
+      },
+      "delete_flag": {
+        "type": "integer",
+        "description": "删除标志 (状态元数据, 0/1)。",
+        "nullable": true
+      },
+      "big_head_url": {
+        "type": "string",
+        "description": "大头像图片 URL (可空)。",
+        "nullable": true
+      },
+      "small_head_url": {
+        "type": "string",
+        "description": "小头像图片 URL (可空)。",
+        "nullable": true
+      },
+      "head_img_md5": {
+        "type": "string",
+        "description": "头像图 md5 (可空)。",
+        "nullable": true
+      },
+      "description": {
+        "type": "string",
+        "description": "描述/简介文本 (第五批, 明文可空)。",
+        "nullable": true
+      },
+      "flag": {
+        "type": "integer",
+        "description": "联系人 flag 原始位图整数 (星标/置顶/屏蔽等 bool 位的来源)。",
+        "nullable": true
+      },
+      "chat_room_notify": {
+        "type": "integer",
+        "description": "群消息提醒设置 (群场景 0=免打扰)。",
+        "nullable": true
+      },
+      "chat_room_type": {
+        "type": "integer",
+        "description": "群类型码 (元数据)。",
+        "nullable": true
+      },
+      "sex": {
+        "type": "integer",
+        "description": "性别码 (extra_buffer 解出; 如 0=未知/1=男/2=女)。",
+        "nullable": true
+      },
+      "country": {
+        "type": "string",
+        "description": "国家/地区 (extra_buffer 解出, 明文可空)。",
+        "nullable": true
+      },
+      "province": {
+        "type": "string",
+        "description": "省份 (extra_buffer 解出, 明文可空)。",
+        "nullable": true
+      },
+      "city": {
+        "type": "string",
+        "description": "城市 (extra_buffer 解出, 明文可空)。",
+        "nullable": true
+      },
+      "friend_source": {
+        "type": "integer",
+        "description": "好友来源码 (加好友场景; 元数据)。",
+        "nullable": true
+      },
+      "is_starred": {
+        "type": "integer",
+        "description": "星标好友 0/1 标志 (flag bit6; 底层 bool, 出线为整数)。",
+        "nullable": true
+      },
+      "is_collapsed": {
+        "type": "integer",
+        "description": "折叠的群聊 0/1 标志 (flag bit28; 底层 bool, 出线为整数)。",
+        "nullable": true
+      },
+      "is_pinned": {
+        "type": "integer",
+        "description": "置顶 0/1 标志 (flag bit11; 底层 bool, 出线为整数)。",
+        "nullable": true
+      },
+      "blocks_moments": {
+        "type": "integer",
+        "description": "不让对方看我的朋友圈(屏蔽) 0/1 标志 (flag bit8; 底层 bool, 出线为整数)。",
+        "nullable": true
+      },
+      "hide_their_moments": {
+        "type": "integer",
+        "description": "不看对方朋友圈 0/1 标志 (flag bit16; 底层 bool, 出线为整数)。",
+        "nullable": true
+      },
+      "chat_only": {
+        "type": "integer",
+        "description": "仅聊天 0/1 标志 (flag bit23; 底层 bool, 出线为整数)。",
+        "nullable": true
+      },
+      "is_muted": {
+        "type": "integer",
+        "description": "免打扰 0/1 标志 (派生自 local_type+chat_room_notify; 底层 bool, 出线为整数)。",
+        "nullable": true
+      },
+      "signature": {
+        "type": "string",
+        "description": "个性签名 (批I extra_buffer 解出, 明文可空)。",
+        "nullable": true
+      },
+      "moments_cover_url": {
+        "type": "string",
+        "description": "朋友圈封面图 URL (可空)。",
+        "nullable": true
+      },
+      "labels": {
+        "type": "string",
+        "description": "联系人标签名, 逗号分隔 (可空)。",
+        "nullable": true
+      },
+      "friend_add_time": {
+        "type": "integer",
+        "description": "好友添加时间 unix 秒 (可空; 老版本/未回填为 null)。",
+        "nullable": true
+      },
+      "openim_company": {
+        "type": "string",
+        "description": "企微(@openim) 公司名 (可空)。",
+        "nullable": true
+      },
+      "openim_realname": {
+        "type": "string",
+        "description": "企微(@openim) 实名 (可空)。",
+        "nullable": true
+      }
+    }
+  },
+  "ContactPack": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "GET /contacts/{wxid}/pack 的一键概览裸对象 (非 {data,meta} 信封): 联系人名称解析 + 近期消息。",
+    "properties": {
+      "contact": {
+        "type": "array",
+        "description": "联系人名称解析行 (通常 1 条; 名称/备注/别名)",
+        "items": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "wxid": {
+              "type": "string",
+              "description": "联系人 wxid"
+            },
+            "nick_name": {
+              "type": "string",
+              "description": "昵称 (可空)",
+              "nullable": true
+            },
+            "remark": {
+              "type": "string",
+              "description": "备注 (可空)",
+              "nullable": true
+            },
+            "alias": {
+              "type": "string",
+              "description": "微信号/别名 (可空)",
+              "nullable": true
+            }
+          }
+        }
+      },
+      "recent_messages": {
+        "type": "array",
+        "description": "近期消息 (最多 5 条; 热查尽力而为, 不可用则空)",
+        "items": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "create_time": {
+              "type": "integer",
+              "description": "消息时间 unix 毫秒/秒",
+              "nullable": true
+            },
+            "local_type": {
+              "type": "integer",
+              "description": "消息本地类型码",
+              "nullable": true
+            },
+            "sender": {
+              "type": "string",
+              "description": "发送人 wxid (可空)",
+              "nullable": true
+            },
+            "text": {
+              "type": "string",
+              "description": "消息文本预览 (可空)",
+              "nullable": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "Session": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条会话 (聊天列表项) 详情 —— GET /api/v1/sessions/{id} (get_session_detail) 返回 L2 session 表整行 (inspect_query→fetch_row 的 `SELECT * FROM session WHERE username=?`), 即 V3Session 结构全 25 列, 列名即 JSON 键。 (字段清单是详情端点 GET /sessions/{id} 的全集 (V3Session 25 列, SELECT * 全出; 列序 = init_session_table 建表序)。nullable 按 Rust 类型定: 仅 summary / last_sender_display_name / draft / last_msg_sender 是 Option<String>→nullable=true, 其余 NOT NULL→false。\n\n重要背离 (实测代码, 非臆造): 列表端点 GET /api/v1/sessions (get_sessions→native_query::hot_sessions) 与详情**R5 扩全后字段已对齐** (列表 ≈ 详情的明文列 + conv_id/is_group 便利键)。列表是\"热查\"直读加密 session.db 的 SessionTable (read_hot_sessions), hot.rs 里 session_json 组 ~20 键 (R5 扩全, 字段集与本详情 V3Session 行对齐): conv_id (=username 同值, 供当 conv 查消息)、username、is_group (bool)、summary、summary_len (摘要字符数, 唯一派生, 同冷查)、last_sender_display_name、unread_count、last_msg_type、last_msg_sub_type、sort_timestamp、session_type、is_hidden、status、draft、last_msg_sender、last_timestamp、last_clear_unread_timestamp、last_msg_locald_id、last_msg_ext_type、unread_first_msg_srv_id。直读加密 session.db 的 SessionTable (read_hot_sessions) 按 sort_timestamp 倒序; 会话列几乎全是原始列直取。相比详情 25 列: 列表少 _sha 影子列 + account_id/username_sha 类内部列、多 conv_id/is_group 便利键; meta.summary.total_sessions=全量, has_more=本页<全量 (热查无游标, 增大 limit 取更多)。R5 前列表只出 conv_id/is_group/shards 3 键。所以若要一份共享 Session schema, 列表与详情字段已对齐 (R5 后), 无需\"详情父集 + 列表子集\"表达 —— 无需拆两个 schema; 列表 ≈ 详情的明文列子集 + conv_id/is_group 便利键, 详情端点仍返 25 列全行。\n\n另: /sessions/{id}/pack (get_session_pack) 是另一端点, 不在本形状范围。)",
+    "properties": {
+      "account_id_sha": {
+        "type": "string",
+        "description": "本账号 wxid 的 sha256 (分账号隔离/JOIN 键, PK 组成)"
+      },
+      "source": {
+        "type": "string",
+        "description": "数据来源库名 (如 session.db, PK 组成)"
+      },
+      "source_native_id": {
+        "type": "string",
+        "description": "源库原生记录 id (PK 组成)"
+      },
+      "username_sha": {
+        "type": "string",
+        "description": "会话对方 id (username) 的 sha256 (JOIN 键)"
+      },
+      "account_id": {
+        "type": "string",
+        "description": "本账号 wxid (明文)"
+      },
+      "username": {
+        "type": "string",
+        "description": "会话对方 wxid (单聊) 或群 id (群聊) 明文, 即 ADR conv_id, 也是本端点的路径 id key"
+      },
+      "unread_count": {
+        "type": "integer",
+        "description": "未读消息数"
+      },
+      "last_msg_type": {
+        "type": "integer",
+        "description": "最后一条消息的类型码"
+      },
+      "last_msg_sub_type": {
+        "type": "integer",
+        "description": "最后一条消息的子类型码"
+      },
+      "sort_timestamp": {
+        "type": "integer",
+        "description": "会话列表排序时间戳"
+      },
+      "summary_len": {
+        "type": "integer",
+        "description": "会话摘要 (最后消息预览) 原文字节长度"
+      },
+      "summary": {
+        "type": "string",
+        "description": "会话摘要/最后一条消息文本预览 (明文, 可空)",
+        "nullable": true
+      },
+      "last_sender_len": {
+        "type": "integer",
+        "description": "最后发送者显示名字节长度"
+      },
+      "last_sender_display_name": {
+        "type": "string",
+        "description": "最后一条消息发送者显示名 (明文, 可空)",
+        "nullable": true
+      },
+      "session_type": {
+        "type": "integer",
+        "description": "会话类型 (元数据, 第四批状态列)"
+      },
+      "is_hidden": {
+        "type": "integer",
+        "description": "是否隐藏/折叠会话 (0/1)"
+      },
+      "status": {
+        "type": "integer",
+        "description": "会话状态标记 (非0=稀有特殊标记)"
+      },
+      "draft_len": {
+        "type": "integer",
+        "description": "草稿文本字节长度"
+      },
+      "draft": {
+        "type": "string",
+        "description": "当前草稿文本 (明文, 可空)",
+        "nullable": true
+      },
+      "last_msg_sender": {
+        "type": "string",
+        "description": "最后一条消息发送者 wxid (群聊内, 明文, 可空; 第六批 ADR-451)",
+        "nullable": true
+      },
+      "last_timestamp": {
+        "type": "integer",
+        "description": "最后一条消息时间戳"
+      },
+      "last_clear_unread_timestamp": {
+        "type": "integer",
+        "description": "最后一次清除未读的时间戳"
+      },
+      "last_msg_locald_id": {
+        "type": "integer",
+        "description": "最后一条消息的本地 local_id"
+      },
+      "last_msg_ext_type": {
+        "type": "integer",
+        "description": "最后一条消息扩展类型"
+      },
+      "unread_first_msg_srv_id": {
+        "type": "integer",
+        "description": "首条未读消息的服务器 id"
+      }
+    }
+  },
+  "SessionPack": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "GET /sessions/{id}/pack 的一键概览裸对象 (非 {data,meta} 信封): 会话标识 + 是否群 + 近期消息。",
+    "properties": {
+      "conv": {
+        "type": "string",
+        "description": "会话 id (对方 wxid 或群 id)"
+      },
+      "is_group": {
+        "type": "boolean",
+        "description": "是否群聊 (@chatroom 结尾)"
+      },
+      "recent_messages": {
+        "type": "array",
+        "description": "近期消息 (最多 10 条; 热查尽力而为)",
+        "items": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "create_time": {
+              "type": "integer",
+              "description": "消息时间 unix 毫秒/秒",
+              "nullable": true
+            },
+            "local_type": {
+              "type": "integer",
+              "description": "消息本地类型码",
+              "nullable": true
+            },
+            "sender": {
+              "type": "string",
+              "description": "发送人 wxid (可空)",
+              "nullable": true
+            },
+            "text": {
+              "type": "string",
+              "description": "消息文本预览 (可空)",
+              "nullable": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "Message": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "只读微信 HTTP API 的单条消息行 (L1 message 表 = V3Message)。GET /api/v1/messages/{id} 详情端点经 inspect_query 的 `SELECT * FROM message` 返回下列 28 列全行; 列表端点 GET /api/v1/messages?conv= 热查返回的是另一套字段集 (R5 扩全 20 字段, 已与冷查对齐; 见 notes)。 (两个端点返回**不同形状**, 本 fields 列的是 base V3Message 行 (详情端点)。\n\n(1) 列表 GET /api/v1/messages?conv=<wxid|群id> 走**热查** (hot_messages → native-core QueriedMsg, R5 扩全), 每行 22 键 (R16-0 加 conv_id), **字段集与冷查 message 行对齐** (派生字段复用 ingest 同批纯函数, 热=冷零漂移): source_native_id(string, =msg_anchor)、conv_id(string, 所属会话 id, 同冷查 message.conv_id; **R16-0 加** —— 全局扫命令按会话归属靠它)、local_id/server_id/server_seq/origin_source/upload_status/download_status/sort_seq/status(integer)、create_time(integer, **毫秒**, R6 已归一与冷查详情同单位)、local_type(integer, Msg_ 打包原值; 冷查详情该列名为 local_type_raw)、msg_type(integer, 主类型)、msg_type_name(string, TEXT/IMAGE/APP_XML…)、msg_sub_type(integer, 可空)、msg_sub_type_name(string, 可空)、decode_kind(string, plain/zstd…)、sys_type(string, 可空, 系统消息分类)、is_chatroom(bool)、raw_xml_present(bool)、sender(string, **R16-0 起与冷查同语义** —— 复用同一份 resolve_sender_parts: Name2Id > 群 content 前缀 > 单聊 status 方向(2 已发=本账号/其它=对方) > @sender_unknown 占位; **恒有值**, 不再可空)、text(string, 已解码正文, 群消息已去 wxid: 前缀)。offset>0 及无 conv 均 400。\n\n(2) 详情 GET /api/v1/messages/{id} 走 inspect_query 的 `SELECT * FROM message WHERE source_native_id=?1` (handwritten.rs:1759), 返回上列 28 列全行, data 数组恰 1 条。\n\n(3) 冷查投影 (无 conv, 互斥选择器 kind/mentions/quote/conv_type=official) 返回的是**派生表行, 不是本 base 行**, 各带 create_time+conv_id 前缀列 + 类型专属列: kind=image→message_media {media_kind, md5, file_size, play_length, cdn_url}(CMD_MEDIA); 名片投影→message_card {card_nickname, card_alias, card_username, company}(CMD_CARDS); 位置→message_location {latitude, longitude, poiname, label, cityname}(CMD_LOCATIONS); kind=call→message_call 行; kind=link/file→appmsg(message_app)派生行; kind=system(可带 sys_type 过滤)→events_query 系统消息行; kind=biz 或 conv_type=official→公众号 biz 消息行; mentions/mentions_me→@提及行; quote→引用/thread 行。\n\n类型口径: 详情端点是动态 SELECT * 经 sql_value_json 序列化 —— SQLite INTEGER 列→JSON 整数、TEXT→字符串、NULL→null、无 BLOB 列; 故 is_chatroom / raw_xml_present 虽在 V3Message Rust struct 中是 bool, HTTP 实际出的是 0/1 整数 (已按 integer 标注)。nullable=true 的仅 msg_sub_type / msg_sub_type_name / sys_type (CREATE TABLE 中无 NOT NULL, Rust 为 Option)。) 投影 kind=call/link/file/image/system/biz 各返子集附加字段 (下列 kind=* 标注的), 均可空。",
+    "properties": {
+      "account_id_sha": {
+        "type": "string",
+        "description": "账号 id 的 sha 脱敏指纹 (message 表主键之一)"
+      },
+      "source": {
+        "type": "string",
+        "description": "来源库标识 (如 message; 主键之一)"
+      },
+      "source_native_id": {
+        "type": "string",
+        "description": "源库原生消息 id; 即 /messages/{id} 详情端点用来定位单条的键列"
+      },
+      "conv_id_sha": {
+        "type": "string",
+        "description": "会话 id 的 sha 脱敏指纹"
+      },
+      "server_id": {
+        "type": "integer",
+        "description": "服务器消息 id"
+      },
+      "server_seq": {
+        "type": "integer",
+        "description": "服务器消息序列号"
+      },
+      "origin_source": {
+        "type": "integer",
+        "description": "消息来源分类 (Msg_ 现成整数列, L2-only)"
+      },
+      "upload_status": {
+        "type": "integer",
+        "description": "媒体上传状态 (Msg_ 现成整数列, L2-only)"
+      },
+      "download_status": {
+        "type": "integer",
+        "description": "媒体下载状态 (Msg_ 现成整数列, L2-only)"
+      },
+      "create_time": {
+        "type": "integer",
+        "description": "消息发送时间 (unix 秒)"
+      },
+      "sort_seq": {
+        "type": "integer",
+        "description": "会话内排序序列"
+      },
+      "status": {
+        "type": "integer",
+        "description": "消息状态码"
+      },
+      "msg_type": {
+        "type": "integer",
+        "description": "消息类型码 (归一后的主类型)"
+      },
+      "msg_type_name": {
+        "type": "string",
+        "description": "消息类型的人话名称"
+      },
+      "msg_sub_type": {
+        "type": "integer",
+        "description": "消息子类型码 (无则 null; Rust Option<i64>)",
+        "nullable": true
+      },
+      "msg_sub_type_name": {
+        "type": "string",
+        "description": "消息子类型人话名称 (无则 null)",
+        "nullable": true
+      },
+      "local_type_raw": {
+        "type": "integer",
+        "description": "Msg_.local_type 原始类型值 (未归一)"
+      },
+      "sender_wxid_sha": {
+        "type": "string",
+        "description": "发送人 wxid 的 sha 脱敏指纹"
+      },
+      "is_chatroom": {
+        "type": "integer",
+        "description": "是否群聊消息, 0/1 布尔标志; V3Message Rust 侧为 bool, 但 message 表存 INTEGER, SELECT * 经 sql_value_json 原样出 0/1 整数"
+      },
+      "text_content_sha": {
+        "type": "string",
+        "description": "正文的 sha 指纹"
+      },
+      "text_content_len": {
+        "type": "integer",
+        "description": "正文字符/字节长度"
+      },
+      "raw_xml_present": {
+        "type": "integer",
+        "description": "是否存在原始 xml, 0/1 布尔标志; Rust 侧 bool 但 SELECT * 经 sql_value_json 实际出 0/1 整数"
+      },
+      "decode_kind": {
+        "type": "string",
+        "description": "正文解码方式/种类 (解码器标注)"
+      },
+      "sys_type": {
+        "type": "string",
+        "description": "系统消息 (msg_type 10000) 粗分类 revoke/pat/hongbao/transfer/topmsg/member_join/member_remove/other; 非系统消息为 null",
+        "nullable": true
+      },
+      "account_id": {
+        "type": "string",
+        "description": "账号 id 明文 (ADR-426 第一类明文列, 与 account_id_sha 同源)"
+      },
+      "conv_id": {
+        "type": "string",
+        "description": "会话 id 明文 (对方 wxid 或群 id)"
+      },
+      "sender_wxid": {
+        "type": "string",
+        "description": "发送人 wxid 明文"
+      },
+      "text_content": {
+        "type": "string",
+        "description": "消息正文明文 (已解码)"
+      },
+      "kind": {
+        "type": "string",
+        "description": "投影子类标 (call/link/file/image/system/biz)",
+        "nullable": true
+      },
+      "duration_sec": {
+        "type": "integer",
+        "description": "通话时长 (秒; kind=call)",
+        "nullable": true
+      },
+      "invite_type": {
+        "type": "integer",
+        "description": "通话邀请类型码 (kind=call)",
+        "nullable": true
+      },
+      "result": {
+        "type": "string",
+        "description": "通话结果 (kind=call)",
+        "nullable": true
+      },
+      "app_type": {
+        "type": "integer",
+        "description": "链接/小程序类型码 (kind=link)",
+        "nullable": true
+      },
+      "title": {
+        "type": "string",
+        "description": "链接/卡片标题 (kind=link)",
+        "nullable": true
+      },
+      "type_label": {
+        "type": "string",
+        "description": "链接类型标签 (kind=link)",
+        "nullable": true
+      },
+      "url": {
+        "type": "string",
+        "description": "链接 URL (kind=link)",
+        "nullable": true
+      },
+      "file_ext": {
+        "type": "string",
+        "description": "文件扩展名 (kind=file)",
+        "nullable": true
+      },
+      "file_name": {
+        "type": "string",
+        "description": "文件名 (kind=file)",
+        "nullable": true
+      },
+      "file_size": {
+        "type": "integer",
+        "description": "文件字节数 (kind=file/image)",
+        "nullable": true
+      },
+      "cdn_url": {
+        "type": "string",
+        "description": "图片/媒体 CDN URL (kind=image)",
+        "nullable": true
+      },
+      "md5": {
+        "type": "string",
+        "description": "媒体 md5 (kind=image)",
+        "nullable": true
+      },
+      "media_kind": {
+        "type": "integer",
+        "description": "媒体类型码 (kind=image)",
+        "nullable": true
+      },
+      "play_length": {
+        "type": "integer",
+        "description": "播放时长 (秒; kind=image 视频/语音)",
+        "nullable": true
+      },
+      "date": {
+        "type": "string",
+        "description": "日期串 (kind=system)",
+        "nullable": true
+      },
+      "label": {
+        "type": "string",
+        "description": "系统消息标签 (kind=system)",
+        "nullable": true
+      },
+      "text": {
+        "type": "string",
+        "description": "系统消息文本 (kind=system)",
+        "nullable": true
+      }
+    }
+  },
+  "Chatroom": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "GET /api/v1/chatrooms/{id} 返回 data[0] 的群信息对象; 源自 inspect_query 对 L1 chatroom 表执行 SELECT * FROM chatroom WHERE chatroom_id=?1, JSON 键即该表全部列名 (按键名字母序)。 (端点实现是 SELECT * FROM chatroom (crates/native-query/src/handwritten.rs:1759 fetch_row ← inspect_query:1778 ← inspect_one native-http/src/lib.rs:1894), 故输出键=chatroom 表全部列, 无投影/无别名重命名 (实测键与列名逐字一致印证)。键序为字母序 (serde_json BTreeMap, 见 inspect_query:1793 row.into_iter().collect())。共 20 列; 用户实测到的 13 键是该表原始 schema, 缺的 7 列 (announcement_editor / announcement_publish_time / xml_announcement / chat_room_status / chatroom_remark / chatroom_remark_len / is_still_member) 是后续批次新增 (storage.rs:941-947 CREATE + ensure_chatroom_columns:964 对旧库 ALTER 补列), 当前代码新建/迁移过的 L1 库都会带这 7 列, 实测所用旧测试库尚未含它们, 故此处补全为完整 20 列。类型经 sql_value_json (handwritten.rs:1580) 渲染: SQLite INTEGER→JSON 整数, TEXT→字符串, NULL→null; 因此 is_still_member 虽是 Rust bool, 线上 JSON 实际是整数 0/1 (type 标 integer 更贴合真实返回)。所有 owner_wxid/owner_wxid_sha/announcement/announcement_editor/xml_announcement/chatroom_remark 为 nullable TEXT 列, 取不到时返回 JSON null。)",
+    "properties": {
+      "account_id": {
+        "type": "string",
+        "description": "当前登录账号 wxid (明文; ADR-426 第一类明文列)"
+      },
+      "account_id_sha": {
+        "type": "string",
+        "description": "当前登录账号 wxid 的 sha 哈希 (PK/JOIN 键)"
+      },
+      "announcement": {
+        "type": "string",
+        "description": "群公告正文 (明文; 无公告时为 null)",
+        "nullable": true
+      },
+      "announcement_editor": {
+        "type": "string",
+        "description": "群公告最后编辑者 wxid (批H; L2-only; 无则 null)",
+        "nullable": true
+      },
+      "announcement_len": {
+        "type": "integer",
+        "description": "群公告字符数 (第二类元数据)"
+      },
+      "announcement_publish_time": {
+        "type": "integer",
+        "description": "群公告发布时间 (秒级时间戳; 批H; 无则 0)"
+      },
+      "chat_room_status": {
+        "type": "integer",
+        "description": "群状态位原值 (KI-B; 语义待确认; 默认 0)"
+      },
+      "chatroom_id": {
+        "type": "string",
+        "description": "群 id (明文, 形如 xxxxxxxx@chatroom; 查询主键)"
+      },
+      "chatroom_id_sha": {
+        "type": "string",
+        "description": "群 id 的 sha 哈希 (JOIN 键)"
+      },
+      "chatroom_name": {
+        "type": "string",
+        "description": "群名称/群昵称 (明文)"
+      },
+      "chatroom_name_len": {
+        "type": "integer",
+        "description": "群名称字符数 (第二类元数据)"
+      },
+      "chatroom_remark": {
+        "type": "string",
+        "description": "我给该群的私人备注 (来自 contact.remark; L2-only; 无则 null)",
+        "nullable": true
+      },
+      "chatroom_remark_len": {
+        "type": "integer",
+        "description": "群备注字符数 (无备注时为 0)"
+      },
+      "is_still_member": {
+        "type": "integer",
+        "description": "我是否仍在此群 (1=在群 / 0=已退; ADR-493; Rust 侧为 bool 但存 INTEGER, JSON 出口经 sql_value_json 序列化为整数 0/1 而非布尔)"
+      },
+      "member_count": {
+        "type": "integer",
+        "description": "群成员数量 (metadata)"
+      },
+      "owner_wxid": {
+        "type": "string",
+        "description": "群主 wxid (明文; 未知时为 null)",
+        "nullable": true
+      },
+      "owner_wxid_sha": {
+        "type": "string",
+        "description": "群主 wxid 的 sha 哈希 (未知时为 null)",
+        "nullable": true
+      },
+      "source": {
+        "type": "string",
+        "description": "数据来源标识 (L1 溯源; 复合主键组成部分)"
+      },
+      "source_native_id": {
+        "type": "string",
+        "description": "源库中的原生记录 id (复合主键组成部分)"
+      },
+      "xml_announcement": {
+        "type": "string",
+        "description": "富媒体群公告 XML 原文 (KI-A; L2-only; 无则 null)",
+        "nullable": true
+      }
+    }
+  },
+  "ChatroomMember": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "群聊 (chatroom) 的一名在群成员；GET /api/v1/chatrooms/{id}/members 返回的 data 数组元素。 (字段来源链: handler get_members (native-http/src/lib.rs:1933) → native_query::members_query (native-query/src/handwritten.rs:407-443)。输出 JSON 键由第 437 行 serde_json::json!({...}) 显式构造, 与 SQL \"SELECT member_wxid, display_name, role, joined_at, invited_by FROM chatroom_member\" (第 428 行) 五列一一对应。类型取自 MemberRow 元组别名 (第 403 行) 并与 storage.rs 的 V3ChatroomMember (4210-4230 行) 交叉核实, 两处一致。注意: V3ChatroomMember 结构体另有约 10 个字段 (account_id_sha/source/source_native_id/chatroom_id_sha/member_wxid_sha/account_id/chatroom_id/display_name_len/left_at/is_in_group 等), 但该端点查询未 SELECT, 故不出现在返回对象里。查询含固定谓词 is_in_group=1 (只返在群成员), 且 admins_only=true 时再滤 role!='member'; 排序 ORDER BY role, member_wxid; 分页走 limit/offset (limit 上限 500)。此为列表端点, 无 list vs detail 投影差异。)",
+    "properties": {
+      "member_wxid": {
+        "type": "string",
+        "description": "成员 wxid (微信唯一标识, 明文)。SQL SELECT 首列 member_wxid, 对应 V3ChatroomMember.member_wxid: String。"
+      },
+      "display_name": {
+        "type": "string",
+        "description": "成员在该群内的显示名/群昵称 (群名片)。对应 V3ChatroomMember.display_name: Option<String>, 无群昵称时为 null。",
+        "nullable": true
+      },
+      "role": {
+        "type": "string",
+        "description": "成员角色: \"owner\"(群主) / \"admin\"(管理员) / \"member\"(普通成员)。owner=chat_room.owner, admin=field3 flags&2048。对应 V3ChatroomMember.role: String。"
+      },
+      "joined_at": {
+        "type": "integer",
+        "description": "入群时间 (unix 时间戳, 秒)。对应 V3ChatroomMember.joined_at: Option<i64>, 未知时为 null。",
+        "nullable": true
+      },
+      "invited_by": {
+        "type": "string",
+        "description": "邀请人 wxid — 谁把此成员拉进群 (明文)。对应 V3ChatroomMember.invited_by: Option<String>, 无邀请人信息 (如群主/直接加入) 时为 null。",
+        "nullable": true
+      }
+    }
+  },
+  "FriendVerify": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "GET /api/v1/friend-requests 返回的 data 数组里每个对象 = 一条好友验证/加好友申请记录 (来自 L1 friend_verify 表, 按时间倒序)。 (输出 JSON 键以 handwritten.rs:222 的 serde_json::json! 宏为准, 不等同 SQL SELECT 列名: SELECT 是 `timestamp, user_name, friend_type, is_sender, scene, content`, 但 (1) content 列在输出中改名为键 `greeting`; (2) 额外派生键 `scene_label` = friend_scene_label(scene), 非数据库列。全部 7 字段均非空: 行元组 FriendReqRow=(i64,String,i64,i64,i64,String) 无 Option, 对应 friend_verify 表列全部 NOT NULL, json! 宏对每行必输出全部键。此端点为纯列表 (offset 分页), 无详情/投影变体。)",
+    "properties": {
+      "timestamp": {
+        "type": "integer",
+        "description": "好友验证/申请时间, Unix 秒级时间戳 (结果集按此列倒序排列)。"
+      },
+      "user_name": {
+        "type": "string",
+        "description": "对方 (申请人/被申请人) 的微信 wxid。"
+      },
+      "friend_type": {
+        "type": "integer",
+        "description": "好友验证记录的类型码 (原始 friend_type 整数)。"
+      },
+      "is_sender": {
+        "type": "integer",
+        "description": "是否本账号发起: 1=本账号发出的好友申请, 0=对方发来的申请。"
+      },
+      "scene": {
+        "type": "integer",
+        "description": "加好友来源场景码 (原始数值, 例如 17=名片)。"
+      },
+      "scene_label": {
+        "type": "string",
+        "description": "scene 场景码翻成人话的标签 (17 → \"名片添加\", 其余 → \"场景{n}\")。"
+      },
+      "greeting": {
+        "type": "string",
+        "description": "打招呼语/验证消息正文 (对应 friend_verify.content 列)。"
+      }
+    }
+  },
+  "Moment": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条朋友圈动态 (moment 表的 bare 投影视图, 仅 7 列; 由 native-query moments_query 的 SELECT 决定)。 (数据来源: handler get_moments (crates/native-http/src/lib.rs:497) → native_query::moments_query (crates/native-query/src/handwritten.rs:789)。输出键严格等于该函数 SQL 的 SELECT 列名, 且 serde_json::json! 用相同键名逐一构造, 无 AS 别名, 无嵌套/数组字段。这是一个 bare 投影视图 (源注释 \\\"朋友圈动态 bare 视图\\\"): moment 表 (V3Moment, storage.rs:2465) 实际有约 26 列 (含 tid/moment_type/source_user/location_label/latitude/longitude/title/link_url/source_nickname/is_rich_text/public_user_name/app_name 等), 但本端点只返回上述 7 列, 其余列不出现在响应 data 中。类型三方一致: SELECT 列 = MomentRow 元组 (String, Option<String>, i64, String, i64, i64, i64) = V3Moment 对应字段; 仅 author_nickname 为 Option → nullable=true。响应外层还有 meta (offset_page: has_more/total_count/limit/offset + source), 但那不属于 data 数组内对象字段。)",
+    "properties": {
+      "author": {
+        "type": "string",
+        "description": "发布者微信 id (wxid, 明文; V3Moment.author)"
+      },
+      "author_nickname": {
+        "type": "string",
+        "description": "发布者昵称 (明文, 可为空; V3Moment.author_nickname Option<String>)",
+        "nullable": true
+      },
+      "create_time": {
+        "type": "integer",
+        "description": "动态发布时间 (Unix 时间戳, 秒; 结果按此列倒序; V3Moment.create_time i64)"
+      },
+      "content_desc": {
+        "type": "string",
+        "description": "动态正文文本 (明文; V3Moment.content_desc)"
+      },
+      "media_count": {
+        "type": "integer",
+        "description": "附带媒体数量 (图片/视频张数; V3Moment.media_count i64)"
+      },
+      "like_count": {
+        "type": "integer",
+        "description": "点赞数 (V3Moment.like_count i64)"
+      },
+      "comment_count": {
+        "type": "integer",
+        "description": "评论数 (V3Moment.comment_count i64)"
+      }
+    }
+  },
+  "MomentInteraction": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条朋友圈互动 (某人对某条动态的点赞或评论), 是 GET /api/v1/moments/interactions 返回 data 数组的元素; **R16-3 起冷热双模** (mode=hot/cold/auto): 冷走查询引擎 CMD_INTERACTIONS 读 L2 moment_interaction 表, 热走 native_query::hot_interactions → read_hot_moment_interactions 直读加密 sns.db 的 SnsTimeLine 逐动态 parse_sns_interactions 抽赞/评 (与冷查投影 project_moment_interaction 同一函数)。5 键: create_time/kind/from_nickname/from_user/content。排序 3 键 DESC (create_time, source_native_id, interaction_seq) —— create_time 赞常为 0 大量并列, 补后两键 (moment_interaction PK 尾) 破并列; 冷热两侧类型比较逐位对齐 (i64 数值 / TEXT BINARY 字节)。kind 出**原始** like/comment (Fmt::EnumStr 只作 CLI table 渲染 赞/评论, JSON 出原始值)。create_time 出原始 i64 (unix 秒); from_nickname/from_user/content 可空 (赞的 content 为 null)。",
+    "properties": {
+      "create_time": {
+        "type": "integer",
+        "description": "互动 (点赞/评论) 发生的时间戳整数 (create_time INTEGER NOT NULL); 也是列表倒序排序键 (ORDER BY create_time DESC)。JSON 为原始整数, 非格式化时间串。"
+      },
+      "kind": {
+        "type": "string",
+        "description": "互动类型原始码: \"like\"=赞 / \"comment\"=评论 (kind TEXT NOT NULL)。JSON 输出原始英文码, 中文标签 (赞/评论) 只在 CLI table 渲染时映射。"
+      },
+      "from_nickname": {
+        "type": "string",
+        "description": "互动人 (点赞者/评论者) 的昵称 display 明文; 可能为空。",
+        "nullable": true
+      },
+      "from_user": {
+        "type": "string",
+        "description": "互动人的 wxid (id 类明文, from_user); 可能为空。",
+        "nullable": true
+      },
+      "content": {
+        "type": "string",
+        "description": "评论文本内容明文; 点赞 (kind=like) 时为 NULL/空。",
+        "nullable": true
+      }
+    }
+  },
+  "MomentInboxItem": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "GET /api/v1/moments/inbox 返回 data 数组里的一条朋友圈互动通知 (点赞/评论), 由 CMD_SNS_NOTIFY 单表投影 sns_notify 表 (V3SnsNotify) 而来, 仅含 SELECT 的 5 列。 (字段权威链: get_moments_inbox (native-http/src/lib.rs:639) → cold_cmd(&CMD_SNS_NOTIFY) (lib.rs:646) → run_query 用 col.key 作 JSON 键 + value_json(原值) 作值 (native-query/src/engine.rs:363-374), 再 envelope 包装。输出键严格 = CMD_SNS_NOTIFY.columns 的 key (engine.rs:606-612), 共 5 个, 顺序即上表。\\n\\n类型判据: engine.rs:172 铁律「json 永远原值」——Fmt (含本命令 create_time 的 Fmt::Time) 只装饰 table 渲染, 不改 JSON; value_json (engine.rs:245) 把 SQLite Integer→number(整数)/Text→string/NULL→null。故 create_time 是整数不是 [ts] 字符串。nullable 依 V3SnsNotify 字段 (storage.rs:2354) 与 sns_notify 建表 SQL (storage.rs:2409) 双核: create_time/notify_type=INTEGER NOT NULL, from_user=TEXT NOT NULL, from_nickname/content=TEXT 可空。\\n\\n重要: V3SnsNotify 还有 13 列 (account_id_sha, source, source_native_id, comment_id, feed_id, from_user_sha, to_user_sha, is_unread, del_status, is_relative_me, account_id, to_user, to_nickname) 未进 CMD_SNS_NOTIFY 的 SELECT 列表, 所以不出现在本端点每条 item 里。分页/总数信息 (total_count/has_more 等) 在 envelope 的 meta 层, 非 data item 字段。)",
+    "properties": {
+      "create_time": {
+        "type": "integer",
+        "description": "互动通知的创建时间戳 (V3SnsNotify.create_time, i64, NOT NULL); JSON 为原值整数, Fmt::Time 只在表格层格式化不影响 JSON 类型。"
+      },
+      "notify_type": {
+        "type": "integer",
+        "description": "互动通知类型码 (V3SnsNotify.notify_type, i64, NOT NULL), 区分点赞/评论等种类。"
+      },
+      "from_user": {
+        "type": "string",
+        "description": "互动者 (点赞人或评论人) 的 wxid 明文 (V3SnsNotify.from_user, TEXT NOT NULL)。"
+      },
+      "from_nickname": {
+        "type": "string",
+        "description": "互动者昵称明文 (V3SnsNotify.from_nickname, Option<String>, 可空)。",
+        "nullable": true
+      },
+      "content": {
+        "type": "string",
+        "description": "评论正文文本 (V3SnsNotify.content, Option<String>, 可空; 点赞类通知无正文故为 null)。",
+        "nullable": true
+      }
+    }
+  },
+  "MoneyItem": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条资金往来记录: 转账/红包/群收款三类交易在 money_query 里归一成的统一时间线行 (baked 输出, 非原始表列)。 (形状是合并/baked 输出, 不是任一原始表列的直投。三类子查各 SELECT 不同表列 (transfer: begin_transfer_time/pay_payer/pay_receiver/pay_sub_type + JOIN message_app.transfer_fee; red_envelope: sender_user_name/session_name/hb_type/receive_status; group_pay: message_create_time/session_name + JOIN group_pay_amount + group_pay_member 计数), 但都在 money_query 归一成 MoneyRow 四元组 (&'static str, Option<i64>, String, String) 后, 由 serde_json::json! 序列化成固定 4 键 {kind,time,who,detail}。故 data 数组每个对象只有这 4 个键; who/detail 是拼接后的复合字符串, V3Transfer/V3RedEnvelope/V3GroupPay 的独立列 (payer/receiver/amount/hb_type 等) 不作为独立 JSON 键出现。权威源: crates/native-query/src/handwritten.rs:1316 (MoneyRow) 与 1452-1455 (json! emit); handler get_money 在 crates/native-http/src/lib.rs:507-524。)",
+    "properties": {
+      "kind": {
+        "type": "string",
+        "description": "交易类型标签 (&'static str 字面量), 取值仅 \"转账\"/\"红包\"/\"群收款\" 三种中文。"
+      },
+      "time": {
+        "type": "integer",
+        "description": "交易时间 (Unix 秒, Option<i64>): 转账取 begin_transfer_time, 群收款取 message_create_time; 红包本地无时间戳故为 null。",
+        "nullable": true
+      },
+      "who": {
+        "type": "string",
+        "description": "交易主体人或会话 (拼接串): 转账为 \"付款人 → 收款人\", 红包为发送人 sender_user_name, 群收款为会话名 session_name。"
+      },
+      "detail": {
+        "type": "string",
+        "description": "明细文本 (拼接串): 转账为金额或 \"(金额见消息) 状态码{子类型}\"; 红包为 \"类型码X/状态码Y @会话 (金额本地不存)\"; 群收款为 \"{金额} 已付N/M人\"。"
+      }
+    }
+  },
+  "Favorite": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条收藏项 (favorite 表投影), GET /api/v1/favorites 返回的 data 数组元素; 每对象仅含查询 SELECT 的 6 列 (来源链路: handler get_favorites (native-http/src/lib.rs:526) → native_query::favorites_query (native-query/src/handwritten.rs:452)。输出键非取自 ORM, 而是函数内显式 serde_json::json!({\"server_id\":..,\"fav_type\":..,\"update_time\":..,\"from_user\":..,\"real_chat_name\":..,\"content_len\":..}) 构造 (handwritten.rs:489), 与 SELECT 列 `server_id, fav_type, update_time, from_user, real_chat_name, content_len` (cols, 行461) 顺序一一对应。类型据 native-core/src/storage.rs 的 V3Favorite (行1217) 推得。\n\n差异点 (from_user nullable): 查询行元组 FavRow=(i64,i64,i64,Option<String>,Option<String>,i64) (handwritten.rs:448) 把 from_user 防御性读为 Option<String>; 但 V3Favorite.from_user 是 String 且表 DDL 为 `from_user TEXT NOT NULL` (storage.rs:1276), 故实际数据恒非空, 标 nullable=false。real_chat_name 在 V3Favorite (Option<String>) 与表 DDL (`real_chat_name TEXT` 无 NOT NULL) 均可空, nullable=true。\n\n未返回的列: V3Favorite 还有 account_id_sha/source/source_native_id/local_id/from_user_sha/account_id/source_id/content_len 以外的 note_text 等, 但本端点 SELECT 只取上述 6 列, 其余不出现在 data 对象里。\n\n投影变体: 端点支持可选 ?query 参数 (对 from_user / real_chat_name 做 LIKE 子串过滤), 只改行集不改字段。子资源 --tags / --media (CMD_FAV_TAGS / CMD_FAV_MEDIA, engine.rs) 是 CLI 独立命令, 非本 HTTP 端点返回形状。整个响应还含 meta (offset 分页: offset/limit/count/total/source=cold), 但本 schema 仅描述 data 数组元素。)",
+    "properties": {
+      "server_id": {
+        "type": "integer",
+        "description": "收藏项的服务器 ID (favorite.server_id, i64)"
+      },
+      "fav_type": {
+        "type": "integer",
+        "description": "收藏类型码 (favorite.fav_type; 例如 18=笔记)"
+      },
+      "update_time": {
+        "type": "integer",
+        "description": "收藏更新时间 Unix 时间戳 (favorite.update_time; 结果按此倒序)"
+      },
+      "from_user": {
+        "type": "string",
+        "description": "收藏来源标识 (发送者 wxid 或群 @chatroom, id 类明文; 表列 NOT NULL)"
+      },
+      "real_chat_name": {
+        "type": "string",
+        "description": "群内实际发送者 id (id 类明文; 非群来源收藏为空/null)",
+        "nullable": true
+      },
+      "content_len": {
+        "type": "integer",
+        "description": "收藏正文字符长度 (正文本身不落库, 仅存长度)"
+      }
+    }
+  },
+  "FavMedia": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条收藏媒体 (收藏笔记 type18 content 里的一个图/文件/HTML 引用), 是 GET /api/v1/favorites/media 返回 data 数组的元素; 一收藏多媒体 → 一媒体一行。**R16-3 起冷热双模** (mode=hot/cold/auto): 冷走引擎 CMD_FAV_MEDIA 读 L2 favorite_media, 热走 native_query::hot_favorite_media → read_hot_favorite_media 直读加密 favorite.db 的 fav_db_item 逐收藏 parse_note_media (与冷查投影 project_favorite_media 同一函数)。6 键: fav_server_id/seq/data_type/media_md5/media_size/data_fmt。排序 (fav_server_id DESC, source_native_id DESC, seq ASC)——补 source_native_id 破未同步收藏 server_id=0 并列。data_type 出原始 i64 (2图/6文件/8HTML; Fmt::EnumI64 只作 table); media_size 出原始 i64 字节 (Fmt::Bytes 只作 table)。",
+    "properties": {
+      "fav_server_id": {
+        "type": "integer",
+        "description": "所属收藏 server_id (原始 i64)"
+      },
+      "seq": {
+        "type": "integer",
+        "description": "媒体在笔记内 0 基顺序 (原始 i64)"
+      },
+      "data_type": {
+        "type": "integer",
+        "description": "媒体类别原始 i64 (常见 2图/6文件/8HTML, 但 parse_note_media 保留任意值 → 非封闭枚举; table 渲染只映射 2/6/8)"
+      },
+      "media_md5": {
+        "type": "string",
+        "description": "媒体内容 md5 (parse_note_media 只收带 fullmd5 的项 → 恒非空)"
+      },
+      "media_size": {
+        "type": "integer",
+        "description": "媒体字节数 (原始 i64; table 渲染人读 KB/MB)"
+      },
+      "data_fmt": {
+        "type": "string",
+        "nullable": true,
+        "description": "数据格式 (去前导点, 如 jpg/htm; 可空)"
+      }
+    }
+  },
+  "FavTag": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条收藏标签绑定 (哪条收藏被贴了什么标签), 是 GET /api/v1/favorites/tags 返回 data 数组的元素。**R16-3 起冷热双模** (mode=hot/cold/auto): 冷走引擎 CMD_FAV_TAGS 读 L2 favorite_tag, 热走 native_query::hot_favorite_tags → read_hot_favorite_tags 直读加密 favorite.db 的 fav_bind_tag_db_item LEFT JOIN fav_tag_db_item, 按 anchor (tag_server_id,fav_server_id) 去重 (同冷 L2 upsert)。3 键: tag_server_id/fav_server_id/tag_name。排序 (tag_server_id DESC, source_native_id DESC)——补 source_native_id 破一标签贴多收藏的并列。tag_name LEFT JOIN 缺 → 空串。",
+    "properties": {
+      "tag_server_id": {
+        "type": "integer",
+        "description": "标签服务端 id (原始 i64)"
+      },
+      "fav_server_id": {
+        "type": "integer",
+        "description": "所属收藏服务端 id (原始 i64)"
+      },
+      "tag_name": {
+        "type": "string",
+        "description": "标签名 (LEFT JOIN 缺 → 空串)"
+      }
+    }
+  },
+  "Emoticon": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条自定义表情记录 (GET /api/v1/emoticons 返回的 data 数组元素; 源自 L2 custom_emoticon 表 / emoticon.db kNonStoreEmoticonTable, 按 md5 倒序)。cold 走引擎 CMD_EMOTICONS (native-query/src/engine.rs), hot 走 native_query::hot_emoticons 直读加密 emoticon.db。输出 5 键 (含 cdn_url —— 引擎标 Fmt::Hidden 只藏 table 渲染, json 照出)。源库 type 列 → 输出键 emoticon_type (ETL drain_emoticons 改名)。全非 Option → nullable=false。",
+    "properties": {
+      "caption": {
+        "type": "string",
+        "description": "表情的中文描述/名称 (display 类, 明文; 可空串)"
+      },
+      "md5": {
+        "type": "string",
+        "description": "表情内容的 md5 (32-hex; 身份键, 也是 source_native_id 的来源 Emoticon_<md5>; 结果按此列倒序)"
+      },
+      "emoticon_type": {
+        "type": "integer",
+        "description": "表情类型码 (源库列名是 type, 输出键改为 emoticon_type)"
+      },
+      "product_id": {
+        "type": "string",
+        "description": "表情商店商品 id (可空串)"
+      },
+      "cdn_url": {
+        "type": "string",
+        "description": "CDN 下载链接 (元数据; 引擎里标 Fmt::Hidden 只藏 table, json 出)"
+      }
+    }
+  },
+  "FinderVisit": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条访问过的视频号号主记录 (GET /api/v1/channels 返回的 data 数组元素; 源自 L2 finder_visit 表 / general.db wcfinderuserpage, 按访问时刻倒序) (权威链路: handler get_channels (native-http/src/lib.rs:538) → native_query::finder_query (native-query/src/handwritten.rs:374)。输出键以查询 serde_json::json! 显式构造的 5 个键为准 (handwritten.rs:390-393), 对应 SELECT visit_time, date(...), name, owner_username, profile_url (handwritten.rs:377)。类型据 FinderRow = (i64, String, String, String, String) (handwritten.rs:370) 全非 Option → 全 nullable=false, 与 V3FinderVisit (storage.rs:1921) 及建表 NOT NULL 一致。注意: 底层 V3FinderVisit 有 9 列, 但本端点只投影其中 4 列 + 1 计算列 visit_date; 未返回 account_id_sha / source / source_native_id / owner_username_sha / account_id。响应外层还有分页 meta (Meta::offset_page, source=Cold), 但 data 数组元素仅上述 5 字段。)",
+    "properties": {
+      "visit_time": {
+        "type": "integer",
+        "description": "访问该视频号主页的时刻, unix 秒 (10 位, 非毫秒); 结果按此列倒序"
+      },
+      "visit_date": {
+        "type": "string",
+        "description": "由 visit_time 按本地时区格式化的访问日期 (date(visit_time,'unixepoch','localtime'), 形如 YYYY-MM-DD); SQL 计算列非表列"
+      },
+      "name": {
+        "type": "string",
+        "description": "视频号昵称/名称 (display 类, 明文)"
+      },
+      "owner_username": {
+        "type": "string",
+        "description": "视频号号主的 wxid/微信号 (id 类, 明文)"
+      },
+      "profile_url": {
+        "type": "string",
+        "description": "视频号主页链接 URL (含频道 id, L2-only 元数据, 明文)"
+      }
+    }
+  },
+  "SearchHit": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "GET /api/v1/search 全文搜索命中的一条消息行 (data 数组元素); 由 search_query 从 MessageSearchHit 显式重新组键而成, 明文正文+定位字段 (端点 GET /api/v1/search, handler get_search (crates/native-http/src/lib.rs:1866)。链路: get_search → native_query::search_query (crates/native-query/src/handwritten.rs:1906) → native_core::storage::search_messages (crates/native-core/src/storage.rs:505, 返回 Vec<MessageSearchHit>, 结构定义 storage.rs:476-481)。输出 JSON 键在 search_query 内用 serde_json::json! 显式重组 (handwritten.rs:1922-1927), 恰好 4 个键, 与 MessageSearchHit 字段一一对应, 键名 == 结构字段名。两条 SQL 取值路径列集一致: (1) 关键词>=3字走 FTS trigram, SELECT m.create_time, m.conv_id, m.sender_wxid, m.text_content, ORDER BY bm25(message_fts) (storage.rs:525); (2) <3字走 LIKE 兜底, SELECT create_time, conv_id, sender_wxid, text_content, ORDER BY create_time DESC (storage.rs:540)。差异说明: 任务提示的\"高亮\"字段实际不存在——text_content 是完整明文正文而非高亮片段; bm25 相关度分仅用于 FTS 路 ORDER BY, 不在 SELECT 中, 故输出无 score/rank 字段。分页 has_more 等在响应 envelope 的 meta 里(非 data 元素字段), 且 meta.account 仅多账号时取 account_sha 前 8 位。所有字段为具体 Rust 类型(无 Option)故全部 nullable=false; 底层 message 表这些列若为 NULL 则 rusqlite r.get() 直接报错。)",
+    "properties": {
+      "create_time": {
+        "type": "integer",
+        "description": "消息创建时间, Unix 时间戳(秒); 源列 message.create_time (i64)"
+      },
+      "conv_id": {
+        "type": "string",
+        "description": "命中消息所属会话 ID(明文 talker 标识); 源列 message.conv_id (String)"
+      },
+      "sender_wxid": {
+        "type": "string",
+        "description": "发送者 wxid(明文); 源列 message.sender_wxid (String)"
+      },
+      "text_content": {
+        "type": "string",
+        "description": "命中消息的正文文本(明文完整正文, 非高亮片段); 源列 message.text_content (String)"
+      }
+    }
+  },
+  "StatRow": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "GET /api/v1/stats 返回的 data 数组一行: 某聚合维度的取值 + 该维度下的消息条数 (排行行, 按 count 降序)。 (来源: get_stats (crates/native-http/src/lib.rs:548) → native_query::stats_query (crates/native-query/src/handwritten.rs:948) → query_stats (同文件:916)。data 数组每个对象**只有 label 与 count 两个键**, 由 handwritten.rs:959-960 手动构造 `serde_json::json!({\"label\": l, \"count\": n})`。**关键**: SQL 是 `SELECT {expr} AS label, count(*) AS n`, 但 JSON 键是 count 不是 n (JSON 构造步骤覆盖了 SQL 别名)。by 参数(day/sender/conv/type, 默认 day)只改变 label 值的语义, 不改变键名, 键始终是 {label, count}。此外命令特有汇总 total_messages / dimension / groups_shown 收在 meta.summary, **不属于** data 行字段, 故未列入。)",
+    "properties": {
+      "label": {
+        "type": "string",
+        "description": "分组维度的取值。随查询参数 by 变化其含义 (键名恒为 label): by=type→消息类型名(msg_type_name, 如 文本/图片); by=conv→会话id(conv_id); by=sender→发送人wxid(sender_wxid); by=day→日期(date(create_time/1000,'unixepoch','localtime'), 形如 YYYY-MM-DD)。数据库中该列可为 NULL, 但代码用 unwrap_or_else 把 NULL 替换为字符串 '(空)', 故 JSON 输出恒为字符串、永不为 null。"
+      },
+      "count": {
+        "type": "integer",
+        "description": "该分组的消息条数, 即 SQL count(*)。SQL 里别名为 n, 但构造 JSON 时重命名为 count (源类型 i64)。"
+      }
+    }
+  },
+  "DormantSession": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "沉睡会话排行的一行 — 每个会话取其最近一条消息时间, 按最久没说话升序排列 (最久没说话在前)。由 native-query handwritten.rs 的 dormant_query 对 message 表 GROUP BY conv_id 聚合生成。 (data 数组元素由 handwritten.rs:877 的 serde_json::json! 宏直接构造, 键名硬编码为 conv_id / last_message_day / message_count — 不是 SQL 列原名或别名 (SELECT 里 date(...) 和 count(*) 是无别名表达式)。分页字段 has_more/total_count/limit/offset 位于响应 meta 中 (Meta::offset_page), 不在 data 对象内, 故不属于本形状。类型全部由查询函数的显式 Rust 绑定 (String/Option<String>/i64) 确定, 无需回溯 V3* 表结构。)",
+    "properties": {
+      "conv_id": {
+        "type": "string",
+        "description": "会话 ID (私聊对端 wxid 或群聊 chatroom id), 来自 message 表 conv_id 列, 是 GROUP BY 的聚合键。Rust 绑定为 String, 不为空。"
+      },
+      "last_message_day": {
+        "type": "string",
+        "description": "该会话最近一条消息所在的本地日历日 (YYYY-MM-DD), 由 SQL date(max(create_time)/1000,'unixepoch','localtime') 求得。底层是 Option<String> 但已 unwrap_or_default, 无值时为空字符串, JSON 永不为 null。"
+      },
+      "message_count": {
+        "type": "integer",
+        "description": "该会话累计消息总条数, 来自 SQL count(*)。Rust 绑定为 i64。"
+      }
+    }
+  },
+  "Followup": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条\"漏回会话\"记录: 每个会话取末条非系统消息, 且该末条是对方发的(本账号 account_id 还没回), 用于跟进/待回复提醒。 (权威来源: handler get_followups (crates/native-http/src/lib.rs:575) → native_query::followups_query (crates/native-query/src/handwritten.rs:740-779)。输出键直接取自该函数 serde_json::json! 宏(handwritten.rs:771-774), 共 6 个键, 无其它字段。类型取自 FollowupRow 别名 (handwritten.rs:735): (i64, String, String, Option<String>, Option<String>, Option<String>), 并与 native-core/src/storage.rs 的 V3Message 结构(create_time:i64 / conv_id:String / sender_wxid:String / msg_type_name:String / text_content:String)交叉核对一致。注意 last_sender_wxid/msg_type_name/text_content 底层 V3Message 声明为非空 String, 但查询按 Option<String> 读取, JSON 可序列化为 null, 故标 nullable=true。 ⚠️ 与任务提示不符: 任务描述此端点为\"引用回复 (message_app refermsg: 回复正文+被引原文)\", 但真实代码是\"漏回/待回复会话\"排行(每会话末条非系统消息且为对方所发), 与 refermsg/引用原文无关, 不存在被引原文类字段。已按真实代码返字段。 分页参数: private_only(true 时 AND is_chatroom=0 仅单聊)/limit(默认50, max500)/offset。data 外层另有 meta(offset_page: has_more/total_count/limit/offset + source=cold), 不属本 data 行对象。)",
+    "properties": {
+      "last_create_time": {
+        "type": "integer",
+        "description": "该会话最后一条(非系统, msg_type!=10000)消息的发送时间, Unix 毫秒时间戳 (对应 message.create_time, i64)"
+      },
+      "datetime": {
+        "type": "string",
+        "description": "最后一条消息时间的本地日期时间字符串, 由 SQL datetime(create_time/1000,'unixepoch','localtime') 格式化 (如 2024-01-02 15:04:05)"
+      },
+      "conv_id": {
+        "type": "string",
+        "description": "会话 ID (明文; 单聊为对方 wxid, 群聊为 chatroom id)"
+      },
+      "last_sender_wxid": {
+        "type": "string",
+        "description": "最后一条消息发送者的 wxid (此端点只返对方发的末条, 即 sender != 本账号 account_id; 查询已 WHERE sender_wxid IS NOT NULL, 但行类型为 Option<String> 故可空)",
+        "nullable": true
+      },
+      "msg_type_name": {
+        "type": "string",
+        "description": "最后一条消息的类型人话名 (如 TEXT/IMAGE/VOICE 等; 对应 message.msg_type_name)",
+        "nullable": true
+      },
+      "text_content": {
+        "type": "string",
+        "description": "最后一条消息的正文文本 (明文; 对应 message.text_content)",
+        "nullable": true
+      }
+    }
+  },
+  "ExtractRow": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "GET /api/v1/extract 的 data 数组元素: 从单条文本消息正则/扫描抽出的一个结构化命中 (一条消息命中多个值会展开成多行)。 (行结构 (6 个键) 对所有 kind 恒定, 不随 kind 增删字段; 只有 kind 字段的标签值与 value 的语义随 ?kind (url/email/amount/phone/idcard → 链接/邮箱/金额/手机号/身份证) 变化。value 只在 msg_type=1 纯文本消息上抽取; 同一条消息命中多个值会展开成多行, 此时 create_time/date/conv_id/sender_wxid 相同而 value 不同。注意 JSON 键以 serde_json::json! 预组为准 (handwritten.rs:1300-1303): value 是抽出的值而非原始 text_content, kind 为代码追加的标签而非 SQL 列。命令特有汇总 messages_matched/total_matches/shown 在 meta.summary 里, 不在 data 行内。)",
+    "properties": {
+      "create_time": {
+        "type": "integer",
+        "description": "命中来源消息的创建时间, Unix 毫秒时间戳 (来自 message.create_time, i64)。"
+      },
+      "date": {
+        "type": "string",
+        "description": "消息的本地日期字符串 YYYY-MM-DD (SQL date(create_time/1000,'unixepoch','localtime') 换算得来)。"
+      },
+      "conv_id": {
+        "type": "string",
+        "description": "消息所属会话的 id (message.conv_id)。"
+      },
+      "sender_wxid": {
+        "type": "string",
+        "description": "消息发送人的 wxid (message.sender_wxid, Option<String>, 可能为 null)。",
+        "nullable": true
+      },
+      "kind": {
+        "type": "string",
+        "description": "抽取类别的中文标签 (extract_kind_label: 链接/邮箱/金额/手机号/身份证), 值随请求 ?kind 参数而定。"
+      },
+      "value": {
+        "type": "string",
+        "description": "从消息文本抽出的一个结构化值 (URL/邮箱/金额/手机号/身份证串; 具体语义随 kind 变化)。"
+      }
+    }
+  },
+  "RawPayload": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条原始 payload 归档记录 (L1 raw_payload_archive 表; GET /api/v1/msgraw 溯源/调试 dump, 由 msgraw_query 手建行组装) (输出 JSON 键不是照抄 SELECT 列名: msgraw_query 用 json! 宏手建行 (handwritten.rs:643-646), SELECT 的 payload_json 列被解析后以键名 `payload` 输出 (值为对象, 非法 JSON 退化为 string), 其余 6 列 (id/ingest_time/event_type/event_action/source_native_id) 键名与列名一致。全部 6 键恒存在 (json! 固定组装), 底层 raw_payload_archive 6 个来源列均 NOT NULL, 故无 nullable 字段。类型依据 MsgrawRow=(i64,i64,String,String,String,String,String) 与 storage.rs 表结构。此形状仅冷查 (L1) 有, 热查物理无源。)",
+    "properties": {
+      "id": {
+        "type": "integer",
+        "description": "归档行主键 (INTEGER PRIMARY KEY AUTOINCREMENT); 单调插入序, 兼作 24h 重放游标"
+      },
+      "ingest_time": {
+        "type": "integer",
+        "description": "采集/入库时间戳 (毫秒; 24h 滚动窗口按此列 prune)"
+      },
+      "event_type": {
+        "type": "string",
+        "description": "事件类型 (如 message; archive 顶层分类)"
+      },
+      "event_action": {
+        "type": "string",
+        "description": "事件动作 (与 event_type 共同标识该条事件的具体动作)"
+      },
+      "source": {
+        "type": "string",
+        "description": "源库文件名 (如 message_0.db)。source_native_id 不带分片, 而同名会话表可能同时存在于多个分片 (真库实测 700 张同名 Msg_ 表同时在 message_0.db 和 message_5.db), 光靠 native_id 认不出哪条来自哪个分片; 可用 ?source= 直接钉死一条"
+      },
+      "source_native_id": {
+        "type": "string",
+        "description": "源消息原生 id (如 Msg_1:1; msgraw 的 native_id 精确过滤即匹配此列)"
+      },
+      "payload": {
+        "type": "object",
+        "description": "原始 payload —— 由 payload_json 列解析后的对象 (明文模式含原始事件全字段); 若列内容非合法 JSON 则退化为原始字符串"
+      }
+    }
+  },
+  "NameEntry": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "GET /api/v1/names 返回 data[] 里的一条 wxid→显示名解析结果 (冷 mode 由 resolve_names_query 查 L1 person 表; hot mode 由 hot_resolve_names 读源库 contact.db —— 4 键+nullable 判定冷热皆同, 仅数据源不同)。 (形状极稳定: data 数组每个对象恰好这 4 个键, 由 handwritten.rs:171-176 的 serde_json::json! 显式构造 (非通用 SELECT 反射), 与实测键 alias/nick_name/remark/wxid 完全一致。键名 wxid 来自 SQL 列 username 的重命名。GET 与 POST /api/v1/names 共用 resolve_names_query, 两者行形状相同。分页/总数等在 envelope 的 meta 里, 不在 data 行内。nullable 判定以查询闭包的 get 类型为准 (wxid=String 非空; 其余三者=Option<String> 可空); 注意 nick_name 在 V3Person 结构体里是非空 String, 但查询防御性地以 Option<String> 读取, 故 API 输出仍可能为 null。)",
+    "properties": {
+      "wxid": {
+        "type": "string",
+        "description": "联系人的原始微信 wxid (SQL 列 person.username, 在闭包里重命名为 wxid; 既是查询入参也是结果回显, 恒非空)"
+      },
+      "nick_name": {
+        "type": "string",
+        "description": "联系人自设的昵称 (person.nick_name; 查询按 Option<String> 读取, 缺失时为 null)",
+        "nullable": true
+      },
+      "remark": {
+        "type": "string",
+        "description": "我给该联系人设置的备注名 (person.remark; 未设置备注时为 null)",
+        "nullable": true
+      },
+      "alias": {
+        "type": "string",
+        "description": "联系人自定义的微信号/alias (person.alias; 未设置时为 null)",
+        "nullable": true
+      }
+    }
+  },
+  "ExecRow": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "只读 SQL 逃生口结果行 (随查询变, 无固定字段; 键=SELECT 的列名/别名)"
+  },
+  "Avatar": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条头像记录 (GET /api/v1/avatars 返回的 data 数组元素; 不含头像图片本体 BLOB; 源自 L2 avatar_image 表 / head_image.db head_image 表, 按 update_time 倒序)。cold 走引擎 CMD_AVATARS (native-query/src/engine.rs), hot 走 native_query::hot_avatars 直读 head_image.db (WHERE username!=空 对齐 pipeline 跳空)。共 3 键。",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "头像归属 wxid (空串行冷查 pipeline 跳过, 热查同滤)"
+      },
+      "md5": {
+        "type": "string",
+        "description": "头像内容 md5"
+      },
+      "update_time": {
+        "type": "integer",
+        "description": "更新时刻 (unix 秒; 原始 i64, 非格式化)"
+      }
+    }
+  },
+  "Location": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条位置分享 (GET /api/v1/locations 返回的 data 数组元素; type48 位置消息派生, 按 create_time 倒序)。cold 走引擎 CMD_LOCATIONS (native-query/src/engine.rs) 读 L2 message_location, hot 走 native_query::hot_locations 全局扫 msg48 + parse_location。共 7 键。经纬度 JSON 出原始 f64 (引擎 Fmt::Float(5) 只作用 table 渲染)。",
+    "properties": {
+      "create_time": {
+        "type": "integer",
+        "description": "消息时刻 (unix 毫秒; 原始 i64)"
+      },
+      "conv_id": {
+        "type": "string",
+        "description": "会话 id (对方 wxid 或群 id)"
+      },
+      "latitude": {
+        "type": "number",
+        "description": "纬度 (北纬正; 原始 f64)"
+      },
+      "longitude": {
+        "type": "number",
+        "description": "经度 (东经正; 原始 f64)"
+      },
+      "poiname": {
+        "type": "string",
+        "nullable": true,
+        "description": "地点名 (POI; 可空)"
+      },
+      "label": {
+        "type": "string",
+        "nullable": true,
+        "description": "地址串 (可空)"
+      },
+      "cityname": {
+        "type": "string",
+        "nullable": true,
+        "description": "城市名 (可空)"
+      }
+    }
+  },
+  "GroupEvent": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条群成员进出记录 (GET /api/v1/group-events 返回的 data 数组元素; type10000 系统消息派生, 一消息可多成员 → 一成员一行, 按 event_time 倒序)。cold 走引擎 CMD_GROUP_EVENTS (native-query/src/engine.rs) 读 L2 chatroom_member_event, hot 走 native_query::hot_group_events 全库扫 msg10000 + parse_member_events。5 键对齐; event_kind 出原始 join/remove (EnumStr 只作 table 渲染)。",
+    "properties": {
+      "event_time": {
+        "type": "integer",
+        "description": "事件时间 (= 消息 create_time; unix 毫秒, 原始 i64)"
+      },
+      "conv_id": {
+        "type": "string",
+        "description": "群会话 id (@chatroom)"
+      },
+      "event_kind": {
+        "type": "string",
+        "enum": [
+          "join",
+          "remove"
+        ],
+        "description": "事件类别: join 进群 / remove 退群 (原始值; table 渲染映射 进群/退群)"
+      },
+      "member_nickname": {
+        "type": "string",
+        "nullable": true,
+        "description": "进出成员昵称 (display; 可空)"
+      },
+      "member_wxid": {
+        "type": "string",
+        "nullable": true,
+        "description": "进出成员 wxid (纯文本无 wxid 时为 null)"
+      }
+    }
+  },
+  "HongbaoClaim": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条红包领取明细 (GET /api/v1/money/claims 返回的 data 数组元素; type10000 hongbao 领取通知派生, 按 create_time 倒序)。cold 走引擎 CMD_HONGBAO (native-query/src/engine.rs) 读 L2 message_hongbao_claim ⋈ message, hot 走 native_query::hot_hongbao_claims 全局扫 msg10000 + parse_hongbao_claim。5 键对齐; is_own_envelope 出原始 0/1 整数 (EnumI64 只作 table 渲染)。金额微信不写进消息 → 不含。",
+    "properties": {
+      "create_time": {
+        "type": "integer",
+        "description": "领取时间 (= 消息 create_time; unix 毫秒, 原始 i64)"
+      },
+      "conv_id": {
+        "type": "string",
+        "description": "会话 id (私聊 wxid / 群 @chatroom)"
+      },
+      "send_id": {
+        "type": "string",
+        "description": "红包单号 (同一红包多人领 → 多行同 send_id)"
+      },
+      "is_own_envelope": {
+        "type": "integer",
+        "enum": [
+          0,
+          1
+        ],
+        "description": "方向 (原始 i64; table 渲染: 0 我领的 / 1 我发的被领)"
+      },
+      "peer_name": {
+        "type": "string",
+        "description": "对方昵称 (我领的=发红包的人; 我发的被领=领我红包的人)"
+      }
+    }
+  },
+  "GroupPayMember": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条群收款付款人 (GET /api/v1/money/payers 返回的 data 数组元素; type49 群收款 newaa payerlist 派生, 一群收款消息多付款人 → 一人一行, 按 bill_no 倒序)。cold 走引擎 CMD_GROUP_PAY_MEMBERS (native-query/src/engine.rs) 读 L2 group_pay_member, hot 走 native_query::hot_group_pay_members 全局扫 msg49 + parse_appmsg payerlist。4 键对齐; amount_fen 出原始 i64 分 (Fmt::Money 只作 table), pay_status 出原始 0/1 (EnumI64 只作 table)。",
+    "properties": {
+      "bill_no": {
+        "type": "string",
+        "description": "群收款账单号 (同一笔群收款多付款人 → 多行同 bill_no)"
+      },
+      "payer_wxid": {
+        "type": "string",
+        "description": "付款人 wxid (明文)"
+      },
+      "amount_fen": {
+        "type": "integer",
+        "description": "应付金额 (原始 i64, 单位分; ÷100 = 元)"
+      },
+      "pay_status": {
+        "type": "integer",
+        "enum": [
+          0,
+          1
+        ],
+        "description": "支付状态 (原始 i64; table 渲染: 0 未付 / 1 已付)"
+      }
+    }
+  },
+  "PiiHit": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条疑似隐私号码命中 (GET /api/v1/pii-scan 返回的 data 数组元素; msg1 文本派生, 一消息多命中→多行, 按 create_time 倒序, top-N 无翻页)。cold 走 pii_scan_query 读 L1 message, hot 走 native_query::hot_pii_scan 全扫 msg1 + scan_pii_in_text 纯函数。value 默认打码 (reveal=true 显全)。",
+    "properties": {
+      "create_time": {
+        "type": "integer",
+        "description": "消息时间 (unix 毫秒, 原始 i64)"
+      },
+      "conv_id": {
+        "type": "string",
+        "description": "会话 id"
+      },
+      "sender_wxid": {
+        "type": "string",
+        "nullable": true,
+        "description": "发送人 wxid"
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "手机号",
+          "身份证"
+        ],
+        "description": "命中类型"
+      },
+      "value": {
+        "type": "string",
+        "description": "命中值 (默认打码如 138****5678; reveal=true 显全)"
+      }
+    }
+  },
+  "Card": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条分享名片 (GET /api/v1/cards 返回的 data 数组元素; type42 名片消息派生, 按 create_time 倒序)。cold 走引擎 CMD_CARDS (native-query/src/engine.rs) 读 L2 message_card, hot 走 native_query::hot_cards 全局扫 msg42 + parse_card。共 6 键 (被推荐人身份)。company 键映射冷查列 card_open_im_desc。",
+    "properties": {
+      "create_time": {
+        "type": "integer",
+        "description": "消息时刻 (unix 毫秒; 原始 i64)"
+      },
+      "conv_id": {
+        "type": "string",
+        "description": "会话 id (对方 wxid 或群 id)"
+      },
+      "card_nickname": {
+        "type": "string",
+        "nullable": true,
+        "description": "被推荐人昵称 (可空)"
+      },
+      "card_alias": {
+        "type": "string",
+        "nullable": true,
+        "description": "被推荐人微信号 (可空)"
+      },
+      "card_username": {
+        "type": "string",
+        "description": "被推荐人身份 (v3_ 名片分享 token 或 wxid; 名片核心, 恒有)"
+      },
+      "company": {
+        "type": "string",
+        "nullable": true,
+        "description": "企微公司名 (openimdesc; 仅企微名片有, 可空)"
+      }
+    }
+  },
+  "BizContact": {
+    "type": "object",
+    "additionalProperties": true,
+    "description": "一条企微(企业微信)联系人 (GET /api/v1/biz-contacts 返回的 data 数组元素; 源自 L2 bizchat_user 表 / bizchat.db user_info 表)。cold 走引擎 CMD_BIZ_CONTACTS, hot 走 native_query::hot_biz_contacts 直读 bizchat.db (WHERE user_id!=空 对齐 pipeline 跳空 user_id)。共 3 键。",
+    "properties": {
+      "user_name": {
+        "type": "string",
+        "description": "昵称 (可空串)"
+      },
+      "user_id": {
+        "type": "string",
+        "description": "企微 id (身份, 空行冷查跳过)"
+      },
+      "brand_user_name": {
+        "type": "string",
+        "description": "品牌号 gh_ (可空串)"
+      }
+    }
+  }
+}

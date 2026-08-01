@@ -1,0 +1,16 @@
+{
+  "data": [
+    {
+      "item_count": 2,
+      "msg_id": "fwd1",
+      "source": "msg"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 20,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

@@ -1,0 +1,7 @@
+         7  50.0%  wxid_alice
+         2  14.2%  wxid_bob
+         1   7.1%  acc
+         1   7.1%  gh_news
+         1   7.1%  sysmsg
+         1   7.1%  wxid_replier
+         1   7.1%  wxid_sender

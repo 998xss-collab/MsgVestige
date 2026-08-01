@@ -1,0 +1,18 @@
+{
+  "data": [
+    {
+      "caption": "笑哭",
+      "cdn_url": "http://cdn/emo",
+      "emoticon_type": 1,
+      "md5": "emomd5",
+      "product_id": "prod1"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 30,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

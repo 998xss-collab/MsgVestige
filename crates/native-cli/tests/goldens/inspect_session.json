@@ -1,0 +1,36 @@
+{
+  "data": [
+    {
+      "account_id": "acc",
+      "account_id_sha": "a",
+      "draft": null,
+      "draft_len": 0,
+      "is_hidden": 0,
+      "last_clear_unread_timestamp": 0,
+      "last_msg_ext_type": 0,
+      "last_msg_locald_id": 0,
+      "last_msg_sender": null,
+      "last_msg_sub_type": 0,
+      "last_msg_type": 0,
+      "last_sender_display_name": null,
+      "last_sender_len": 0,
+      "last_timestamp": 0,
+      "session_type": 0,
+      "sort_timestamp": 0,
+      "source": "session",
+      "source_native_id": "wxid_alice",
+      "status": 0,
+      "summary": null,
+      "summary_len": 0,
+      "unread_count": 0,
+      "unread_first_msg_srv_id": 0,
+      "username": "wxid_alice",
+      "username_sha": "x"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "source": "cold",
+    "total_count": 1
+  }
+}

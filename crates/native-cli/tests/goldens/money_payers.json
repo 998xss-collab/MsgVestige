@@ -1,0 +1,23 @@
+{
+  "data": [
+    {
+      "amount_fen": 800,
+      "bill_no": "BILL1",
+      "pay_status": 0,
+      "payer_wxid": "wxid_p2"
+    },
+    {
+      "amount_fen": 800,
+      "bill_no": "BILL1",
+      "pay_status": 1,
+      "payer_wxid": "wxid_p1"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 20,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 2
+  }
+}

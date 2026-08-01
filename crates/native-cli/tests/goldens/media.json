@@ -1,0 +1,20 @@
+{
+  "data": [
+    {
+      "cdn_url": "http://cdn/x",
+      "conv_id": "chatA",
+      "create_time": 1300,
+      "file_size": 102400,
+      "md5": "d41d8cd98f00b204e9800998ecf8427e",
+      "media_kind": "image",
+      "play_length": 0
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 30,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "data": [
+    {
+      "account_id": "acc",
+      "account_id_sha": "a",
+      "conv_id": "chatA",
+      "conv_id_sha": "x",
+      "create_time": 1000,
+      "decode_kind": "x",
+      "download_status": 0,
+      "is_chatroom": 0,
+      "local_type_raw": 0,
+      "msg_sub_type": null,
+      "msg_sub_type_name": null,
+      "msg_type": 1,
+      "msg_type_name": "文本",
+      "origin_source": 0,
+      "raw_xml_present": 0,
+      "sender_wxid": "wxid_alice",
+      "sender_wxid_sha": "x",
+      "server_id": 0,
+      "server_seq": 0,
+      "sort_seq": 0,
+      "source": "msg",
+      "source_native_id": "m1",
+      "status": 0,
+      "sys_type": null,
+      "text_content": "看 https://example.com/a 联系13800138000 身份证110101199003070011",
+      "text_content_len": 0,
+      "text_content_sha": "x",
+      "upload_status": 0
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "source": "cold",
+    "total_count": 1
+  }
+}

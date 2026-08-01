@@ -1,0 +1,25 @@
+[package]
+name = "common"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+description = "共享 utilities — log / redact / safety (跟 ADR-416 §3.2.4 一致)"
+keywords = ["wechat", "weixin", "utilities"]
+categories = ["api-bindings"]
+
+[lib]
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+tracing.workspace = true
+# log: 统一 tracing init (env-filter 级别 + 按天滚动文件)。
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+# redact: sha8 脱敏 (K-R4 日志不露明文)。
+sha2 = { workspace = true }
+hex = { workspace = true }

@@ -1,0 +1,18 @@
+{
+  "data": [
+    {
+      "conv_id": "g@chatroom",
+      "event_kind": "join",
+      "event_time": 1700000900,
+      "member_nickname": "新人",
+      "member_wxid": "wxid_newbie"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 30,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

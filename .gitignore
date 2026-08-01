@@ -1,0 +1,101 @@
+# 微信数据基座 v3 设计仓库 - .gitignore
+
+# Rust（如果未来在 v3 目录下建 Rust 项目）
+target/
+**/*.rs.bk
+# Cargo.lock 跟踪策略
+# - 顶层 /Cargo.lock 进 git (binary workspace, 跟 ADR-416 一致 — alpha 锁版本可复现)
+# - wechat-poc-0/Cargo.lock 进 git (PoC-0.2 双审 R1 P1-1: SQLCipher 4.5.7 实测基线)
+# - crates-placeholder/*/Cargo.lock 不进 (占名 reservation, 没业务依赖)
+crates-placeholder/**/Cargo.lock
+
+# IDE / 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.bak
+*.log
+
+# PoC 输出物中含敏感信息的（key 偏移、原始 db 样本）
+# baseline-key-offsets-*.json 含 key 偏移，原则上不该公开仓库，但本仓库是个人本地，先保留
+# 如要分享请改为以下规则：
+# **/baseline-key-offsets-*.json
+# **/baseline-key-procedure-*.md
+# **/baseline-protobuf-samples-*.bin
+
+# 测试账号数据（任何形式）
+test-data/
+**/wechat-sample-*.db
+**/*.key
+docs/poc/private/
+
+# OS
+*.lnk
+desktop.ini
+
+# PoC-0.1 临时下载的工具链安装器（不该进 git）
+installers/
+
+# vendored ffmpeg/ffprobe 二进制（~97MB, 太大不进 git；打包时随产品分发, vendor/ffmpeg/README.md 记来源+复现）
+# 代码按 WECHAT_FFMPEG → cli 同目录 → PATH 找它 (native-cli decrypt-images wxgf→图 转码用)
+/vendor/ffmpeg/*.exe
+
+# vendored 微信 WxIsaac64 WASM (3.6MB 黑盒 + Emscripten glue; ADR-467 件3 朋友圈媒体解密; 打包随产品分发,
+# vendor/weflow_wasm/README.md 记来源)。运行期靠系统 node 跑 (native-cli export-sns-media)。
+/vendor/weflow_wasm/*.wasm
+/vendor/weflow_wasm/*.js
+
+# v2 进度文件，已被 poc-progress.js 取代
+poc-progress.json
+
+# PoC L1 sink demo 生成的 SQLite 文件（不入仓库）
+**/l1-poc.db
+**/l1-poc.db-wal
+**/l1-poc.db-shm
+
+# Phase 3.A E2E demo 运行时产物（含真实账户数据，不入仓库）
+wechat-poc-0/tmp/
+
+# 看板 MVP P0 阶段先不入 git, 等 P2 稳定后再决定 (设计 v5 §1 选项 A binary 模式)
+docs-dev/全景看板.html
+docs-dev/.dashboard-error.log
+scripts/dashboard/node_modules/
+
+# 双审临时文件 (codex/claude 各件 prompt/report 一大堆) — 审稿产物, 不入仓库
+.review-tmp/
+
+# CodeGraph 代码索引 (工具生成, 可 `codegraph init` 重建) — 不入仓库
+.codegraph/
+
+# 打包产物 —— scripts/package-local.ps1 的输出, 不进仓库。
+dist/
+target-static/
+
+# ── 发布前补 (2026-08-01, 首次上远程时按判据全扫加的) ──────────────────
+# 判据: 凡是"跑出来的、不是写出来的"东西都不该进仓。
+# 之前只挡了 target/ 和 target-static/, 而实际工作树里躺着一堆 target-审查用副本
+# (target-audit-* / target-review-* / target-r15run 等), 一个都没挡住。
+target-*/
+# rustc 内部错误时自动落在仓库根的崩溃报告 (含本机绝对路径)。
+rustc-ice-*.txt
+# 任何数据库产物: L1 库、瘦库、导出的副本。都是真实微信数据, 绝不能进仓。
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+# 日志与诊断包。
+*.log
+logs/
+*-logs-*.zip
+# 临时/草稿目录。
+scratchpad/
+tmp/
+.tmp/

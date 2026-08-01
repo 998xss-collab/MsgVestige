@@ -1,0 +1,24 @@
+{
+  "data": [
+    {
+      "conv_id": "chatA",
+      "create_time": 1000,
+      "date": "1970-01-01",
+      "kind": "链接",
+      "sender_wxid": "wxid_alice",
+      "value": "https://example.com/a"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 30,
+    "offset": 0,
+    "source": "cold",
+    "summary": {
+      "messages_matched": 1,
+      "shown": 1,
+      "total_matches": 1
+    },
+    "total_count": 1
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "data": [
+    {
+      "account_id": "acc",
+      "chatrooms": 1,
+      "favorites": 1,
+      "messages": 14,
+      "moments": 1,
+      "persons": 2
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "source": "cold",
+    "total_count": 1
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "data": [
+    {
+      "alias": "alice_wx",
+      "local_type": 1,
+      "nick_name": "小爱",
+      "remark": "同事阿爱",
+      "username": "wxid_alice"
+    },
+    {
+      "alias": "",
+      "local_type": 1,
+      "nick_name": "阿波",
+      "remark": "",
+      "username": "wxid_bob"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 50,
+    "source": "cold"
+  }
+}

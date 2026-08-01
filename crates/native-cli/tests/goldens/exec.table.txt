@@ -1,0 +1,6 @@
+conv_id | n
+chatA | 7
+chatB | 2
+chatC | 1
+g@chatroom | 3
+gh_news | 1

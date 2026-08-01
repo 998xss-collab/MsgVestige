@@ -1,0 +1,26 @@
+[package]
+name = "xtask"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+description = "cargo xtask 工具 — codegen + docs check (跟 ADR-417 §3 一致)"
+keywords = ["xtask", "codegen", "docs"]
+categories = ["development-tools::build-utils"]
+
+[[bin]]
+name = "xtask"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+syn.workspace = true
+quote.workspace = true
+walkdir.workspace = true
+serde.workspace = true
+serde_yaml.workspace = true

@@ -1,0 +1,14 @@
+[1970-01-01 08:00:01] chatA  wxid_alice  看 https://example.com/a 联系13800138000 身份
+[1970-01-01 08:00:02] chatA  acc  好的收到
+[1970-01-01 08:00:01] chatB  wxid_bob  在吗
+[2023-11-15 06:13:20] gh_news  gh_news  [文本]
+[1970-01-01 08:00:03] g@chatroom  sysmsg  "甲"邀请"乙"加入了群聊
+[1970-01-01 08:00:01] chatA  wxid_alice  [位置]
+[1970-01-01 08:00:01] chatA  wxid_alice  [名片]
+[1970-01-01 08:00:01] chatA  wxid_alice  [图片]
+[1970-01-01 08:00:01] g@chatroom  wxid_alice  [红包领取]
+[1970-01-01 08:00:01] chatB  wxid_bob  [文本]
+[1970-01-01 08:00:01] g@chatroom  wxid_sender  @张三 在吗
+[1970-01-01 08:00:01] chatA  wxid_alice  看链接
+[1970-01-01 08:00:01] chatA  wxid_alice  文件
+[1970-01-01 08:00:02] chatC  wxid_replier  [文本]

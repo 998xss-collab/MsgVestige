@@ -1,0 +1,31 @@
+{
+  "data": [
+    {
+      "account_id": "acc",
+      "account_id_sha": "a",
+      "announcement": "群公告内容示例",
+      "announcement_editor": null,
+      "announcement_len": 0,
+      "announcement_publish_time": 0,
+      "chat_room_status": 0,
+      "chatroom_id": "g@chatroom",
+      "chatroom_id_sha": "x",
+      "chatroom_name": "项目群",
+      "chatroom_name_len": 0,
+      "chatroom_remark": null,
+      "chatroom_remark_len": 0,
+      "is_still_member": 1,
+      "member_count": 3,
+      "owner_wxid": "wxid_owner",
+      "owner_wxid_sha": null,
+      "source": "contact",
+      "source_native_id": "g@chatroom",
+      "xml_announcement": null
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "source": "cold",
+    "total_count": 1
+  }
+}

@@ -1,0 +1,1 @@
+[1200]  chatA  张三  zhangsan  wxid_zhangsan  某公司

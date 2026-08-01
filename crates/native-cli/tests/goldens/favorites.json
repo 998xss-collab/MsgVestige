@@ -1,0 +1,19 @@
+{
+  "data": [
+    {
+      "content_len": 12,
+      "fav_type": 1,
+      "from_user": "wxid_alice",
+      "real_chat_name": "chatA",
+      "server_id": 9001,
+      "update_time": 1700000100
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 50,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

@@ -1,0 +1,175 @@
+name: Release
+
+# 打 tag 触发(v0.1.0-alpha.1 这种)。手动触发用于验证打包流程本身, 不建 Release。
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # 建 GitHub Release 要写权限
+
+jobs:
+  package-windows:
+    name: 打包 Windows 版
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # ⚠️ **必须静态链 CRT**(`+crt-static`), 否则产物依赖 `VCRUNTIME140.dll` —— 那是 VC++ 可再发行
+      # 组件, **不是系统自带**, 没装的机器上双击就报缺 DLL。GitHub 的 windows runner 预装了它, 所以
+      # 验包那步在 CI 上必然过、抓不到这个问题。
+      # (我第一版写的是「实测不依赖任何非系统 DLL」—— 那是假的: 我当时的过滤命令把 vcruntime 写进了
+      #  排除列表, 等于把要找的东西滤掉了。审查方直接读 PE 导入表才拆穿。静态链之后才是真的:
+      #  导入表从 22 个降到 13 个, VCRUNTIME140 消失。)
+      # --locked: 发布产物必须用提交进仓库的那份 Cargo.lock, 不允许解析出别的依赖版本。
+      - name: 编译 release(静态链 CRT)
+        env:
+          RUSTFLAGS: "-C target-feature=+crt-static"
+        run: cargo build --release --locked --bin msgvestige --bin msgvestige-adapter
+
+      - name: 组装发布包
+        shell: pwsh
+        run: |
+          $ver = if ($env:GITHUB_REF -like 'refs/tags/*') { $env:GITHUB_REF -replace '^refs/tags/','' } else { 'dev' }
+          $stage = "dist/msgvestige-wechat-$ver-windows-x64"
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item target/release/msgvestige.exe     $stage/
+          Copy-Item target/release/msgvestige-adapter.exe $stage/
+          # ⚠️ README.md / INSTALL.md 故意不带 —— 会误导拿到包的人:
+          #   README 是仓库内部需求文档索引(「状态: 需求确认中」+ 满篇 ADR 编号);
+          #   INSTALL 描述已退役的 sidecar 架构(说包里有 Node/Electron/wcdb_api.dll/wx_key.dll,
+          #   一个都没有; 让人跑不存在的 migrate-config; 说 auth 要重登微信, 与 --scan 相反)。
+          # **快速开始.md 才是给用户的入口** —— 每条命令和每段输出都是真机跑出来的。
+          Copy-Item "docs-dev/快速开始.md"             $stage/
+          # 数据可见性矩阵 —— 用户装完的第一个问题是「这东西能给我拿到什么」, 答案在这份文档里。
+          # 它逐类记了能不能拿到、从哪条路拿、拿不到卡在哪, 每一格都是真库跑出来的数。
+          Copy-Item "docs-dev/00-当前生效/数据可见性矩阵.md" $stage/
+          # ⚠️ **weflow_wasm 不带**: 它的真身(`*.wasm` / `*.js`)被 .gitignore 排除了, git 里只有一个
+          #    14 字节的 README —— 而本 workflow 走 actions/checkout, 拿到的就是 git 里那份。
+          #    第一版这里写着「体积小直接带上」并真的 Copy-Item 了, 结果拷过去的只有那个 README,
+          #    而且**不报错**: 目录存在(README 是 tracked 的), Copy-Item 照样"成功" —— 本该拦住的
+          #    那道闸被这个 README 顶掉了。用户装完跑 export-sns-media 才会发现缺件。
+          #    要带它得先决定把 wasm 提进 git 或另设分发源, 那是单独一件。现在如实不带 + 写进清单。
+          # ⚠️ **ffmpeg 故意不带**: vendor/ffmpeg 有 195MB, 而它只服务一个可选功能
+          #    (语音导出成 mp3; 不带的话默认导 wav, 功能不受影响)。要 mp3 的自己放一份进
+          #    vendor/ffmpeg/ 再用 `--ffmpeg` 指过去。这条写进包里的说明, 别让人装完发现少东西。
+          @"
+          # 这个包里有什么
+
+          - msgvestige.exe / msgvestige-adapter.exe —— 主程序, **解压即用**, 不依赖任何非系统 DLL。
+
+          - **快速开始.md —— 先看这个。** 体检 + 三条命令跑通全流程, 每条带真实输出, 附常见报错解法。
+          - 数据可见性矩阵.md —— **能拿到什么**: 12 类数据逐类记「能不能拿到 / 从哪条路拿 / 拿不到卡在哪」,
+            每一格都是真库跑出来的, 不是照代码推断。装完先看这份。
+
+          # 这个包里**没有**什么
+
+          - **ffmpeg**(195MB, 故意不带)。它只用于把语音导出成 mp3; 不带的话默认导 wav, 其余功能不受影响。
+            需要 mp3: 自己下一份 ffmpeg.exe/ffprobe.exe 放到 vendor/ffmpeg/, 或用 --ffmpeg 指到你的那份。
+          - **weflow_wasm**(朋友圈媒体取流用)。它的文件没进代码仓库, 所以打不进包。
+            需要导朋友圈媒体: 从源仓库取 vendor/weflow_wasm/ 放到程序同级目录, 并另装 node。
+          - **wx_key.dll**(取 key 的一条**可选回退**路径)。同样没进代码仓库。没有它不影响主路径 ——
+            默认的纯 Rust 取 key 走得通; 只有那条回退用得上它, 放到程序同级目录即可。
+
+          # 先跑这个确认包是好的
+
+          .\msgvestige.exe --version
+          "@ | Set-Content -Encoding UTF8 "$stage/包内清单.md"
+          Compress-Archive -Path "$stage/*" -DestinationPath "dist/msgvestige-wechat-$ver-windows-x64.zip"
+          "ASSET=dist/msgvestige-wechat-$ver-windows-x64.zip" | Out-File -Append $env:GITHUB_ENV
+
+      # **在解包后的目录里真跑一次** —— 只验"workflow 绿了"等于 CI 自己说自己好。
+      # 这一步跑的是**压缩包解出来的那个 exe**, 不是 target/release 里的, 且换到临时目录跑,
+      # 保证不靠仓库里的任何东西。
+      - name: 验包(解压到干净目录真跑)
+        shell: pwsh
+        run: |
+          $tmp = Join-Path $env:RUNNER_TEMP "verify"
+          Expand-Archive -Path $env:ASSET -DestinationPath $tmp -Force
+          Push-Location $tmp
+          ./msgvestige.exe --version
+          if ($LASTEXITCODE -ne 0) { throw "解压后的 msgvestige --version 跑不起来" }
+          # 再验一条真命令的 help(证明子命令表是全的, 不是只有一个空壳)
+          ./msgvestige.exe messages --help > $null
+          if ($LASTEXITCODE -ne 0) { throw "messages --help 跑不起来" }
+          # **每个 exe 都要冒烟 + 断言**, 不能只验 msgvestige —— 包内清单对两个都写了「解压即用」。
+          # (第一版只验了 msgvestige, msgvestige-adapter 既没跑过也没查过依赖。审查方点名的。)
+          ./msgvestige-adapter.exe --help > $null 2>&1
+          if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 2) { throw "msgvestige-adapter 跑不起来(退出码 $LASTEXITCODE)" }
+
+          # **断言不依赖任何非系统 DLL** —— 口径要跟包内清单那句话一致。
+          # ⚠️ 必须**真读 PE 导入表**, 不能在整个二进制里做字符串匹配。本地实测过后者会误报:
+          #    静态版本来干净, 却因为文件里存在 "weixin.dll" 这样的**普通字符串**(不是导入项)被判红。
+          #    (更早我还犯过反向的错: 用 dumpbin + 人肉过滤, 把 vcruntime 写进排除列表, 然后报告「零依赖」。
+          #     两次教训同一个方向 —— 判据要落在**结构**上, 不是文本上。)
+          # 系统 DLL 白名单。前 11 个是 `target-static` 产物**实测**出的导入全集, 后几个留裕度。
+          # ⚠️ 这行原先漏了 —— 我改这段时把含定义的那块一起替换掉, 只剩下面的引用。
+          #    PowerShell 不开 StrictMode, 未定义变量 = $null, 而 `$null -notcontains 任何值` 恒为 true
+          #    ⇒ **每个导入项都被判成非系统 DLL ⇒ 恒抛**, 连本该干净的静态产物也抛。
+          #    这个断言当时是个常量, 输出与产物无关 —— 零信号, 比它替换掉的旧版还糟。
+          #    没被发现是因为本 workflow 只在打 tag 时跑, 加进来之后一次都没执行过。
+          $sysDlls = @('kernel32','ntdll','advapi32','ws2_32','oleaut32','shell32',
+                       'psapi','crypt32','bcryptprimitives','pdh','powrprof',
+                       'user32','ole32','combase','shlwapi','userenv','secur32','bcrypt',
+                       # 下面这批是审查方拿系统自带的 notepad.exe/where.exe 喂这段断言逼出来的缺口 ——
+                       # 它们都是不折不扣的系统 DLL, 漏了就会在**打 tag 那一刻**假红挡住发布,
+                       # 而错误文案还会把人往「CRT 泄漏」上引。宁可白名单宽一点。
+                       'gdi32','comctl32','ucrtbase','msvcrt','iphlpapi','dnsapi','winmm',
+                       'version','rpcrt4','dbghelp','setupapi','comdlg32','cfgmgr32','shcore',
+                       'winhttp','wininet','imm32','uxtheme','oleacc','propsys','windowscodecs')
+          foreach ($exe in @('msgvestige.exe','msgvestige-adapter.exe')) {
+            $bytes = [IO.File]::ReadAllBytes("$tmp/$exe")
+            $e = [BitConverter]::ToInt32($bytes, 0x3c)
+            $nsec = [BitConverter]::ToUInt16($bytes, $e + 6)
+            $optSize = [BitConverter]::ToUInt16($bytes, $e + 20)
+            $magic = [BitConverter]::ToUInt16($bytes, $e + 24)
+            $ddOff = $e + 24 + $(if ($magic -eq 0x20b) { 112 } else { 96 })
+            $impRva = [BitConverter]::ToUInt32($bytes, $ddOff + 8)
+            $secs = @()
+            for ($i = 0; $i -lt $nsec; $i++) {
+              $o = $e + 24 + $optSize + 40 * $i
+              $secs += , @([BitConverter]::ToUInt32($bytes, $o + 12),
+                           [BitConverter]::ToUInt32($bytes, $o + 8),
+                           [BitConverter]::ToUInt32($bytes, $o + 20))
+            }
+            function Rva2Off($rva) {
+              foreach ($s in $script:secs) { if ($rva -ge $s[0] -and $rva -lt $s[0] + [Math]::Max($s[1],1)) { return $s[2] + ($rva - $s[0]) } }
+              return -1
+            }
+            $script:secs = $secs
+            $imports = @()
+            $off = Rva2Off $impRva
+            while ($off -ge 0) {
+              $nameRva = [BitConverter]::ToUInt32($bytes, $off + 12)
+              if ($nameRva -eq 0) { break }
+              $no = Rva2Off $nameRva
+              if ($no -lt 0) { break }
+              $end = $no; while ($bytes[$end] -ne 0) { $end++ }
+              $imports += [Text.Encoding]::ASCII.GetString($bytes, $no, $end - $no).ToLower()
+              $off += 20
+            }
+            if ($imports.Count -eq 0) { throw "$exe 导入表解析不出来(解析逻辑坏了, 不能当成没有依赖)" }
+            $bad = $imports | Where-Object {
+              $_ -notmatch '^api-ms-win-' -and $sysDlls -notcontains ($_ -replace '\.dll$','')
+            }
+            if ($bad) {
+              throw "$exe 依赖非系统 DLL: $($bad -join ', ') —— 包内清单声明的是「不依赖任何非系统 DLL」。若是新引入的合法依赖, 把它放进包里并同步改清单; 若是 CRT 泄漏, 检查 +crt-static。"
+            }
+            Write-Host "$exe 导入 $($imports.Count) 项, 全部是系统 DLL"
+          }
+          Pop-Location
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: ${{ env.ASSET }}
+
+      - name: 建 GitHub Release(仅 tag 触发)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ASSET }}
+          generate_release_notes: true

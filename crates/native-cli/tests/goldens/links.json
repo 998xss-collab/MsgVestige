@@ -1,0 +1,19 @@
+{
+  "data": [
+    {
+      "app_type": 5,
+      "conv_id": "chatA",
+      "create_time": 1800,
+      "title": "好文章",
+      "type_label": "链接",
+      "url": "https://example.com/link"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 30,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

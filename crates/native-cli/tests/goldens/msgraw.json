@@ -1,0 +1,23 @@
+{
+  "data": [
+    {
+      "event_action": "create",
+      "event_type": "message",
+      "id": 1,
+      "ingest_time": 111,
+      "payload": {
+        "conv_id": "chatA",
+        "msg_type": 1
+      },
+      "source": "msg",
+      "source_native_id": "Msg_1:1"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 20,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

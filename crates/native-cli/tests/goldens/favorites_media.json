@@ -1,0 +1,19 @@
+{
+  "data": [
+    {
+      "data_fmt": "jpg",
+      "data_type": 2,
+      "fav_server_id": 9001,
+      "media_md5": "md5abc",
+      "media_size": 4096,
+      "seq": 0
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 50,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

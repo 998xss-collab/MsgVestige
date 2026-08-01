@@ -1,0 +1,96 @@
+# CI workflow — 跟 ADR-408 §3.2 一致
+# 主跑 cargo llvm-cov (跨平台 Win+macOS+Linux), Linux 夜跑 tarpaulin 兜底
+
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  # ⚠️ **这道闸目前仍是红的**(2026-07-28 实测)。用 nightly 是因为 `rustfmt.toml` 里
+  #    `imports_granularity` / `group_imports` 两项是 **nightly-only** —— 稳定版直接忽略它们, 用 stable
+  #    等于配置写了不算数。但**换 nightly 并不能让这道闸变绿**:
+  #      · stable 下 878 处差异 / nightly 下 **966 处 · 129 个文件**(两个数都是实测)
+  #      · 差异遍及没人碰过的文件(如 common/tests/log_redaction_guard.rs、native-cli/src/logs_bundle.rs)
+  #    ⇒ 真实结论: **这个仓库从来没被 `cargo fmt` 排过版**, 不是"按某个工具链排过、换工具链就不认"。
+  #    要让它绿只有一条路: 跑一次 `cargo +nightly fmt --all` 全仓重排(129 文件)并提交。
+  #    那是个会跟所有并发分支冲突的大改动, **待决策**, 本次只把工具链改对, 没做重排。
+  fmt:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # nightly —— 理由见上面那段。只有 fmt 这一个 job 用 nightly, 编译/检查/测试仍是 stable。
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  # ⚠️ 这道闸 2026-07-28 修好过一次, 别再让它红着没人管。两条容易踩的:
+  #  1. **本地只在 Windows 上验不算数** —— 这里跑 ubuntu。历史上 workspace 在 Linux 上**根本编译不过**
+  #     (native-sqlcipher 用了 Windows 专有的 seek_read 没做平台分支; native-core 把 anyhow/tokio/async-trait
+  #     误放进 [target.'cfg(windows)'.dependencies] 段), 而 Windows 上一切正常, 所以谁也没发现。
+  #     本地要验 Linux: docker run --rm -v "<仓库>:/w" -w /w rust:1.96 cargo clippy --workspace --all-targets -- -D warnings
+  #  2. **rustc 1.96 在 Windows 上有个 ICE**(渲染某条 pedantic 警告时崩在 rustc_span:2439), Linux 上不复现。
+  #     已用 4 处定点 #[allow(clippy::pedantic)] 绕开, 每处都写了排查记录; rustc 修了之后应当撤掉重查。
+  clippy:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  test:
+    name: cargo test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --workspace --verbose
+      - run: cargo test --workspace --verbose
+
+  # 随包文档的**机械**体检 —— 不查内容对不对, 只查文本层面坏没坏。
+  #
+  # 为什么要有: 第三轮审查在随包文档里逮到一条**物理上敲不出来的命令** ——
+  # `.\msgvestige.exe` 的反斜杠变成了真的换行字节, 起因是用脚本批量改文档时转义漏了一层。
+  # 这类损坏肉眼几乎读不出来(渲染出来只是换了行), 但用户照着敲一定失败, 而文档开头
+  # 还承诺"每条命令都是真机跑出来的"。改文档要一直用脚本, 就得有一道机器闸。
+  #
+  # 检查脚本自己也过了反例测试: 复刻那次真实事故、少闭合一个代码围栏、表格少一个竖线,
+  # 三个都被逮到 —— 光"当前文档通过"不算数, 那可能只是检查本身没用。
+  docs:
+    name: 随包文档机械体检 (转义事故 / 围栏配对 / 表格 / 宽度)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/check-docs.py
+
+  coverage:
+    name: cargo llvm-cov (line ≥70% / region ≥60%, ADR-408 §3.1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - run: cargo install cargo-llvm-cov --locked
+      - run: cargo llvm-cov --workspace --fail-under-lines 70 --fail-under-regions 60
+
+  # 0.2.0+ nightly branch coverage KI (ADR-408 §3.1)
+  # branch-coverage:
+  #   name: cargo llvm-cov --branch (推 0.2.0+ nightly)
+  #   runs-on: ubuntu-latest
+  #   ...

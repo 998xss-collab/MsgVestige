@@ -1,0 +1,27 @@
+# 换行统一 —— 别让检出配置决定文件内容。
+#
+# 起因(2026-07-28): 有个守卫按「CREATE INDEX ... + 换行」在 schema 文档里定位索引定义。
+# 仓库 core.autocrlf=true 且当时没有本文件, 于是新克隆出来的 .md 是 CRLF, 名字后面多了个回车符,
+# 定位直接失败 → 6 条索引**全部静默跳过**, 守卫在 Windows 检出下是死的。
+# CI 的 test job 恰好有 windows-latest 那条腿。
+#
+# 守卫本身也加了归一化(双保险), 但源头统一才是正解 —— 否则每个按行/按换行解析文本的地方都要各修一遍。
+* text=auto eol=lf
+*.md text eol=lf
+*.rs text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.exe binary
+*.dll binary
+*.db binary
+*.wasm binary
+# 语音解码的测试样本 —— 真二进制。不标的话 `* text=auto` 会把它当文本做换行归一化,
+# 内容被改坏、那条解码测试跟着废掉。(2026-07-28 加本文件时漏了, 用「含 NUL 字节」这个硬判据
+# 扫全仓才发现 —— 靠扩展名猜是不够的。)
+*.silk binary
+*.wav binary
+*.mp3 binary
+*.png binary
+*.jpg binary
+*.zip binary
+*.bin binary

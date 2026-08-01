@@ -1,0 +1,19 @@
+{
+  "data": [
+    {
+      "conv_id": "chatB",
+      "create_time": 1600,
+      "duration_sec": 42,
+      "invite_type": 1,
+      "kind": "语音",
+      "result": "通话时长 00:42"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 30,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

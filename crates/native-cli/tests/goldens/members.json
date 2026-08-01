@@ -1,0 +1,25 @@
+{
+  "data": [
+    {
+      "display_name": "小爱",
+      "invited_by": null,
+      "joined_at": null,
+      "member_wxid": "wxid_alice",
+      "role": "member"
+    },
+    {
+      "display_name": "群主",
+      "invited_by": null,
+      "joined_at": null,
+      "member_wxid": "wxid_owner",
+      "role": "owner"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 1000,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 2
+  }
+}

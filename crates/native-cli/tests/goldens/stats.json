@@ -1,0 +1,41 @@
+{
+  "data": [
+    {
+      "count": 7,
+      "label": "wxid_alice"
+    },
+    {
+      "count": 2,
+      "label": "wxid_bob"
+    },
+    {
+      "count": 1,
+      "label": "acc"
+    },
+    {
+      "count": 1,
+      "label": "gh_news"
+    },
+    {
+      "count": 1,
+      "label": "sysmsg"
+    },
+    {
+      "count": 1,
+      "label": "wxid_replier"
+    },
+    {
+      "count": 1,
+      "label": "wxid_sender"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "source": "cold",
+    "summary": {
+      "dimension": "发送人",
+      "groups_shown": 7,
+      "total_messages": 14
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "data": [
+    {
+      "conv_id": "chatA",
+      "n": 7
+    },
+    {
+      "conv_id": "chatB",
+      "n": 2
+    },
+    {
+      "conv_id": "chatC",
+      "n": 1
+    },
+    {
+      "conv_id": "g@chatroom",
+      "n": 3
+    },
+    {
+      "conv_id": "gh_news",
+      "n": 1
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "source": "cold"
+  }
+}

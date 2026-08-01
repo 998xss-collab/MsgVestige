@@ -1,0 +1,19 @@
+{
+  "data": [
+    {
+      "card_alias": "zhangsan",
+      "card_nickname": "张三",
+      "card_username": "wxid_zhangsan",
+      "company": "某公司",
+      "conv_id": "chatA",
+      "create_time": 1200
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 30,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

@@ -1,0 +1,7 @@
+# rustfmt 配置 — alpha 阶段不卷激进风格
+edition = "2021"
+max_width = 120
+use_field_init_shorthand = true
+use_try_shorthand = true
+imports_granularity = "Module"
+group_imports = "StdExternalCrate"

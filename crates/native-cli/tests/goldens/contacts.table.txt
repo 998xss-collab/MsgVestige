@@ -1,0 +1,2 @@
+同事阿爱  [wxid_alice]  alice_wx
+阿波  [wxid_bob]  

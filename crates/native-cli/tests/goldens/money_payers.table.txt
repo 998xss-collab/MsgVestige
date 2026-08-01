@@ -1,0 +1,2 @@
+BILL1  wxid_p2  8.00元  未付
+BILL1  wxid_p1  8.00元  已付

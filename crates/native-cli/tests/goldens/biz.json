@@ -1,0 +1,18 @@
+{
+  "data": [
+    {
+      "create_time": 1700000000000,
+      "date": "2023-11-15",
+      "gh_id": "gh_news",
+      "msg_type": 1,
+      "title": "公众号文章标题"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 30,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

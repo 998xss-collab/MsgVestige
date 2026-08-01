@@ -1,0 +1,18 @@
+{
+  "data": [
+    {
+      "announcement": "群公告内容示例",
+      "chatroom_id": "g@chatroom",
+      "chatroom_name": "项目群",
+      "member_count": 3,
+      "owner_wxid": "wxid_owner"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 50,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

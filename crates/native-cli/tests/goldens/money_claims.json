@@ -1,0 +1,18 @@
+{
+  "data": [
+    {
+      "conv_id": "g@chatroom",
+      "create_time": 1400,
+      "is_own_envelope": 0,
+      "peer_name": "wxid_bob",
+      "send_id": "HB_SEND_1"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 20,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

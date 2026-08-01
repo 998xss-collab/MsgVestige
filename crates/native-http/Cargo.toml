@@ -1,0 +1,50 @@
+[package]
+name = "native-http"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+description = "HTTP API 皮 (serve/REST) — axum 服务器, 镜像 native-query 共享内核的 REST 端点 (接口设计-③http-api规格.md); 三皮之一"
+keywords = ["wechat", "weixin", "http", "rest"]
+categories = ["web-programming::http-server"]
+
+[lib]
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+# 共享查询内核 (三皮同核): 各端点直调 run_query / query_* / hot_* / account_query, 不重写查询。
+native-query = { path = "../native-query" }
+# Wxid / sha256_hex (账号) / ErrorCode。
+native-core = { path = "../native-core" }
+# 端点闭包签名要命名 `&rusqlite::Connection` (query 函数吃它); 只用类型不建连接。
+rusqlite = { workspace = true }
+# web 框架 (tower/hyper 生态; workspace 给 cors+trace)。
+axum = { workspace = true }
+tower-http = { workspace = true }
+# ServiceExt::oneshot —— serve_video 里把 ServeFile 当 Service 调 (文件级 Range 流大 .mp4 不整块进内存)。
+tower = { version = "0.5", features = ["util"] }
+# /events SSE 事件流建构 (async-stream stream! 宏)。
+async-stream = { workspace = true }
+# axum::serve net (TcpListener) + rt-multi-thread; macros 测试; sync (watch 进度信号 + exec Semaphore);
+# time (SSE 兜底轮询 timeout); signal (serve 优雅关停 ctrl_c)。
+tokio = { workspace = true, features = ["rt-multi-thread", "net", "macros", "sync", "time", "signal"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+anyhow.workspace = true
+tracing.workspace = true
+# 联网媒体 (表情/朋友圈 从微信 CDN 下载, #23): async reqwest **http-only** (微信 CDN 实测 http 非 https, 同 CLI
+# 无 TLS) + stream (边下边限流不整块进内存)。SSRF 闸: 自解析 host 挡私网 IP + .resolve() pin 防 DNS-rebind。
+reqwest = { version = "0.12", default-features = false, features = ["stream"] }
+# reqwest bytes_stream 迭代 (StreamExt::next)。
+futures-util = { version = "0.3", default-features = false }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "net", "macros"] }
+native-core = { path = "../native-core" }
+rusqlite = { workspace = true }
+# ServiceExt::oneshot —— 不起真 TCP 直接过 Router 测端点 (tower-http 0.6 同源 tower 0.5)。
+tower = { version = "0.5", features = ["util"] }

@@ -1,0 +1,82 @@
+[package]
+name = "native-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+description = "alpha 核心运行时 lib — key_provider / cipher / decoder / storage / state / sink / emit / config / media (跟 ADR-416 §3.2.1 一致)"
+keywords = ["wechat", "weixin", "data", "native"]
+categories = ["api-bindings"]
+
+[lib]
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+# 跟 ADR-405 §3.1 (KeyProvider trait) + ADR-410 MATRIX 联动.
+# PR2-1-a 骨架 dep.
+thiserror.workspace = true
+async-trait.workspace = true
+# 跨平台(不是 windows-only): 原先误放在 [target.'cfg(windows)'.dependencies] 段里,
+# 结果 Linux 上整个 crate 编译不过(45 个 anyhow 相关错)。2026-07-28 容器实测发现并移出。
+anyhow.workspace = true
+sha2.workspace = true
+hex.workspace = true
+zeroize.workspace = true
+# PR2-1-b cache: serde + bincode 落盘 + tracing 日志.
+serde = { workspace = true, features = ["derive"] }
+bincode.workspace = true
+tracing.workspace = true
+# ADR-428 NativeCipher: Cipher trait 实现 (纯 Rust 解密, 默认且唯一路径). 跨平台:
+#   native-sqlcipher 全页解密 + deserialize 内存读; native-keyscan 提 verify_passphrase + KeyMaterial.
+native-sqlcipher = { path = "../native-sqlcipher" }
+native-keyscan = { path = "../native-keyscan" }
+# 件 2 语音导出 (ADR-465): SILK v3 解码 + WAV 封装. vendored C 隔离在 native-silk crate.
+native-silk = { path = "../native-silk" }
+# PR2-3-b event payload_json: 隐私过滤输出 = JSON object (raw_payload_archive.payload_json).
+serde_json.workspace = true
+# PR2-4-b storage: L1 sqlite 持久化 (alpha 不加密 — workspace 用 bundled, sqlcipher 推到 L1 加密实现).
+rusqlite.workspace = true
+# PR2-4-d config: config.toml 解析.
+toml.workspace = true
+# PR2-4-e config 校验: ADR-403 §3.4 TD3 validator.
+validator = { workspace = true }
+# PR2-8-b config [cli].auth_password DPAPI 密文 base64 编解码 (ADR-403 §3.5).
+base64 = { workspace = true }
+# PR2-7-a emit/in_proc: alpha EventEmitter = tokio mpsc bounded channel (跨平台核心, 非 windows FFI;
+# adapter-适配器.md §: alpha in-proc Tokio mpsc). 只要 "sync" (mpsc); windows target 另叠 "time" (hook 超时).
+tokio = { workspace = true, features = ["sync", "time"] }
+# PR2-12-a decoder: 微信 4.x message_content zstd 解压 (decoder-解码.md §1).
+# 跨平台 (zstd-sys 编译内捆绑 C zstd 源; 非 wx_key/wcdb vendor-dll FFI, 不涉 K-R7 x64 约束).
+zstd = { workspace = true }
+# 图片 .dat 解密 (05-图片解密方法.md): V2 普通图 AES-128-ECB / 表情包 AES-128-CBC. 纯 Rust RustCrypto.
+aes.workspace = true
+cbc.workspace = true
+# 图片 .dat 定位 (ADR-461): create_time → 本地时区月份目录 (微信按本地时间建 msg/attach/<talker>/<月>/Img)。
+chrono.workspace = true
+# PR2-12-f decoder anchor: source_native_id 复合 md5 锚点合成 (raw-payload-输出格式.md §4 注 r3 P0-B).
+# 纯 Rust md5 (无 C/openssl, 非 vendor-dll FFI, 不涉 K-R7 x64 约束); 跟 zstd/base64 同款良性代码决策.
+md5 = { workspace = true }
+# 媒体子进程 (ffmpeg 转码 / node keystream) 有界 deadline + 到期 kill (media §8: 挂死不占死信号量致 /media DoS)。
+# 纯 Rust std wrapper (Windows WaitForSingleObject / unix waitpid, 无 native dep), 可移植。
+wait-timeout = "0.2"
+# R15 并行 ingest: 批内 decode_row 纯函数并行 (par_iter 保序 collect); 单写者串行 insert 保持水位序。
+# 纯 Rust work-stealing 线程池, 无 native dep, 可移植; run_message_pipeline_jobs 按 --jobs 建**专用** ThreadPool
+# (非全局 build_global, 不污染 keyscan 等其它 rayon 用户)。
+rayon.workspace = true
+
+# PR2-1-b/c cache + ciphertalk: DPAPI/vendor dll FFI — 仅 windows.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true }
+libloading = "0.8"
+sysinfo = { version = "0.30", default-features = false }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
+tempfile.workspace = true
+anyhow.workspace = true
+# PR2-3-a event 枚举 serde snake_case 验证 (workspace 已有, 无新下载)
+serde_json.workspace = true

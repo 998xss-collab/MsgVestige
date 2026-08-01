@@ -1,0 +1,17 @@
+{
+  "data": [
+    {
+      "author": "wxid_bob",
+      "create_time": 1700000300,
+      "is_read": 1,
+      "tid": 2
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 30,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

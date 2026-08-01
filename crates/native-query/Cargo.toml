@@ -1,0 +1,54 @@
+[package]
+name = "native-query"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+description = "共享查询内核 — 信封(Meta/Envelope)/游标 codec/keyset 分页/错误码; 三皮 (CLI/MCP/HTTP) 共用 (查询内核抽取 §4/§6①)"
+keywords = ["wechat", "weixin", "query", "native"]
+categories = ["database"]
+
+[lib]
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+# ErrorCode (CliError 携码) —— 底座枚举, 不动 (查询内核抽取 §6①)。
+native-core = { path = "../native-core" }
+# paginate::filter_hash 走 common::redact::sha8 (游标 filter 指纹)。
+common = { path = "../common" }
+# keyset 分页直读 rusqlite Connection/Row/Value。版本随 workspace, 同 native-core/native-cli。
+rusqlite = { workspace = true }
+# QueryTarget 派生 clap::Args (CLI 皮 flatten 复用同一份查询参数); MCP/HTTP 皮不经 clap, 直接构造 QueryTarget。
+clap = { workspace = true, features = ["derive"] }
+anyhow.workspace = true
+# R16-2 (codex f02f1ff P1): 热查全库扫下沉 `tokio::task::spawn_blocking` —— HTTP serve 是 current_thread
+# runtime, 内联同步长扫会钉死唯一 async 线程(健康检查/无关请求全卡 + request-timeout 无法 fire)。仅用 `rt`
+# 的 spawn_blocking; 所有皮 (CLI/MCP/HTTP) 都在 tokio runtime 内调 hot_*, 故本 crate 从"async 只是语法、
+# 不依赖 tokio"改为**软依赖 tokio(仅 rt 的 spawn_blocking)**。见 hot.rs 头注 + hot_events/hot_calls。
+tokio = { workspace = true }
+# R9 复审 R2#4: ok_or_warn 坏行 warn (facade; 无 subscriber = no-op, CLI/HTTP/MCP shell 有 subscriber 才显)。
+tracing = { workspace = true }
+# 信封 typed Meta/Envelope/Source (derive Serialize)。
+serde = { workspace = true, features = ["derive"] }
+# 信封 emit + Meta.freshness/summary = serde_json::Value。
+serde_json = { workspace = true }
+# 不透明游标 base64url 编解码。
+base64 = { workspace = true }
+# extract 命令 (§6③ 第四批): 从消息文本抽 url / email / amount (phone/idcard 走手写扫描不用它)。
+regex = { workspace = true }
+
+[dev-dependencies]
+# R22 partial-hit 集成测试: 造**空**的源库分片目录 (定位表出 0 分片 → 只走 Tier1, 免加密夹具)。
+tempfile.workspace = true
+# R22-① round-10 对抗审: 端到端跑 ② 的"落库→再查"循环, 需要一个**真能被热查内核读出来**的源库分片 ——
+# 而 `SourceQuery` 只经 SQLCipher4 VFS 开库, 明文 sqlite 进不去。故测试侧自造 SQLCipher4 加密夹具
+# (与 native-sqlcipher `decrypt.rs` 的 `synth_encrypted_db` 同格式, 反向写)。**仅 dev, 产品代码不涉**。
+aes.workspace = true
+cbc.workspace = true
+hmac.workspace = true
+pbkdf2.workspace = true
+sha2.workspace = true

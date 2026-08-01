@@ -1,0 +1,2 @@
+[1000] chatA  wxid_alice  手机号  138****8000
+[1000] chatA  wxid_alice  身份证  1101**********0011

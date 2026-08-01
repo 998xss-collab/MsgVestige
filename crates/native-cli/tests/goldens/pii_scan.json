@@ -1,0 +1,29 @@
+{
+  "data": [
+    {
+      "conv_id": "chatA",
+      "create_time": 1000,
+      "kind": "手机号",
+      "sender_wxid": "wxid_alice",
+      "value": "138****8000"
+    },
+    {
+      "conv_id": "chatA",
+      "create_time": 1000,
+      "kind": "身份证",
+      "sender_wxid": "wxid_alice",
+      "value": "1101**********0011"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "source": "cold",
+    "summary": {
+      "idcard_total": 1,
+      "masked": true,
+      "messages_flagged": 1,
+      "phone_total": 1,
+      "shown": 2
+    }
+  }
+}

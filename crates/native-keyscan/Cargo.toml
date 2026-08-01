@@ -1,0 +1,29 @@
+[package]
+name = "native-keyscan"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# 纯算法层 (跨平台): SQLCipher4 首页校验 + key 类型 + 错误分类.
+thiserror.workspace = true
+zeroize.workspace = true
+sha2.workspace = true
+hex.workspace = true
+pbkdf2.workspace = true
+hmac.workspace = true
+# full 路 dll 提常量 + 两路正则 (PE 解析跨平台可编, 扫内存才 windows-only).
+goblin.workspace = true
+regex.workspace = true
+rayon.workspace = true
+
+# 扫内存仅 Windows x64 (K-R7): 进程枚举 / VirtualQueryEx / ReadProcessMemory.
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
+# image key 扫描 (ADR-461 件3): 候选 key AES-128-ECB 解 V2 sample 首块验证. 仅 windows 扫内存路用.
+aes.workspace = true

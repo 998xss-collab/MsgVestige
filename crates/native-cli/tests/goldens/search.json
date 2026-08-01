@@ -1,0 +1,14 @@
+{
+  "data": [
+    {
+      "conv_id": "chatA",
+      "create_time": 1000,
+      "sender_wxid": "wxid_alice",
+      "text_content": "看 https://example.com/a 联系13800138000 身份证110101199003070011"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "source": "cold"
+  }
+}

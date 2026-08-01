@@ -1,0 +1,18 @@
+{
+  "data": [
+    {
+      "name": "一造物社DIY",
+      "owner_username": "wxid_creator",
+      "profile_url": "https://channels.weixin.qq.com/x",
+      "visit_date": "2023-11-15",
+      "visit_time": 1700000600
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 30,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

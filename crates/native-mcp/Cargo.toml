@@ -1,0 +1,37 @@
+[package]
+name = "native-mcp"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+description = "MCP (Model Context Protocol) 皮 — 手写 JSON-RPC over stdio, 传输无关; 三皮之一, 调 native-query 共享内核 (接口设计-④mcp接口.md)"
+keywords = ["wechat", "weixin", "mcp", "llm"]
+categories = ["command-line-utilities"]
+
+[lib]
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+# 共享查询内核 (三皮同核): 各 wx_ 工具直调 run_query / query_* / hot_* / account_query, 不重写查询。
+native-query = { path = "../native-query" }
+# Wxid / sha256_hex (账号) / ErrorCode。
+native-core = { path = "../native-core" }
+# 工具要命名 open_l1_scoped 返回的 rusqlite::Connection 类型 (冷查 open_cold 助手)。版本随 workspace。
+rusqlite = { workspace = true }
+# JSON-RPC 报文 = serde_json::Value; 工具输出信封也是 Value。
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+anyhow.workspace = true
+# R7 wx_exec DoS 隔离: spawn_blocking (rt — 把可跑无界算力的裸 SQL 移出 stdio async 线程, 15s 界随 exec_hardened
+# 得到) + Semaphore (sync — exec 并发闸, 镜像 HTTP EXEC_SEMAPHORE(4))。其余工具不碰 tokio (同步冷查/薄壳)。
+tokio = { workspace = true, features = ["rt", "sync"] }
+
+[dev-dependencies]
+# 协议/工具单测直建合成 L1 fixture (init_l1_schema + 插假数据) 供 tools 读。
+native-core = { path = "../native-core" }
+rusqlite = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }

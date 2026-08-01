@@ -1,0 +1,18 @@
+{
+  "data": [
+    {
+      "content": "赞了你",
+      "create_time": 1700000500,
+      "from_nickname": "阿波",
+      "from_user": "wxid_bob",
+      "notify_type": "like"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 30,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

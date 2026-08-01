@@ -1,0 +1,69 @@
+[package]
+name = "native-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+description = "alpha CLI binary — 调 native-core API (跟 cli-命令行.md §3 + ADR-411 §3.2 doctor 7 项 一致)"
+keywords = ["wechat", "weixin", "cli", "native"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "msgvestige"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+native-core = { path = "../native-core" }
+# 共享查询内核 (查询内核抽取 §6①): 信封 Meta/Envelope/Source + emit_envelope + 游标/keyset 分页 + CliError/cli_err/classify_error。
+# native-cli 只留 clap 解析 + stdout 呈现 (render_cli_error/退出码) + 非查询命令。
+native-query = { path = "../native-query" }
+# MCP 皮 (接口设计-④mcp接口.md): `native-cli mcp` 子命令 = stdio 传输壳, 调 native-mcp::handle_line
+# (协议+工具在 native-mcp, 传输无关; native-cli 只做 stdin 读行 / stdout 写行)。
+native-mcp = { path = "../native-mcp" }
+# HTTP 皮 (接口设计-③http-api规格.md): `native-cli serve` 子命令 = 调 native_http::serve (axum 服务器)。
+native-http = { path = "../native-http" }
+# ② CLI 自足: ingest / watch 复用 native-adapter 的定位 + 编排引擎 (locate_account_dbs / run_full_ingest /
+# run_message_watch / IngestPlan), 免得建 L1 还得跑 native-adapter 那个独立程序。无循环依赖 (adapter 不依赖 cli)。
+native-adapter = { path = "../native-adapter" }
+# image key 内存扫 (decrypt-images 自动取 key): scan_image_key / WeixinProcess / sha8。
+# 跨平台可编 (算法层无条件, 扫内存 windows-x64 gated); 自动扫路仅 windows-x64 生效, 其余平台走手填 key。
+native-keyscan = { path = "../native-keyscan" }
+common = { path = "../common" }
+# SourceDb::Plain 要能命名 rusqlite::Connection (统一"已解密文件 / 就地解密"两种库句柄)。版本随 workspace, 同 native-core。
+rusqlite = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+# extract 命令: 从消息文本抽 url / email / amount (regex; phone/idcard 走手写扫描不用它)。
+regex = { workspace = true }
+# decrypt-emoji: 表情包从 CDN (http, 非 https 无需 TLS) 下载加密字节 → native-core CBC 解密。blocking 客户端。
+reqwest = { workspace = true }
+anyhow.workspace = true
+tracing.workspace = true
+# mcp 子命令 stdio 传输: io-std/io-util (逐行读写)。serve 子命令: net (TcpListener) + rt-multi-thread (axum 服务器多连接) + sync (serve --watch 的 watch 进度/取消 channel)。
+tokio = { workspace = true, features = ["io-std", "io-util", "net", "rt-multi-thread", "sync", "time"] }
+# sessions/messages 等查询命令 --format json + {data, meta} 信封。
+serde_json = { workspace = true }
+# ① 信封 typed Meta/Envelope/Source (derive Serialize)。
+serde = { workspace = true, features = ["derive"] }
+# ④ 不透明游标 base64url 编解码。
+base64 = { workspace = true }
+# R8 key show: 明文 key hex 副本包 Zeroizing 打印后清零 (补审 P3)。
+zeroize = { workspace = true }
+# R2/⑧ logs bundle: 日志诊断包打 zip (deflate 纯 Rust) + 生成时间戳/文件名 + 解析式 config 脱敏。
+zip = { workspace = true }
+chrono = { workspace = true }
+toml = { workspace = true }
+
+[dev-dependencies]
+async-trait = { workspace = true }
+# R2/⑧ logs_bundle 单测: 临时目录造假日志/config 验打包 + 脱敏。
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+# golden_json 集成测试: 建合成 L1 fixture (init_l1_schema + PRAGMA 驱动插假数据) 供子进程二进制读。
+# 二进制目标无 lib target → 集成测试只能用 dev-deps, 故这里显式挂 native-core / rusqlite / serde_json。
+native-core = { path = "../native-core" }
+rusqlite = { workspace = true }
+serde_json = { workspace = true }

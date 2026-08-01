@@ -1,0 +1,165 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/native-core",
+    "crates/native-cli",
+    "crates/native-query",
+    "crates/native-mcp",
+    "crates/native-http",
+    "crates/native-adapter",
+    "crates/native-keyscan",
+    "crates/native-sqlcipher",
+    "crates/native-silk",
+    "crates/common",
+    "xtask",
+]
+
+# PoC-1 参考实现 + crates.io 占名 placeholder 都不进 workspace
+exclude = [
+    "wechat-poc-0",
+    "crates-placeholder",
+]
+
+[workspace.package]
+version = "0.1.0-alpha"
+edition = "2021"
+authors = ["v3 微信数据基座"]
+license = "MIT"
+repository = "https://github.com/998xss-collab/MsgVestige"
+publish = false
+
+[workspace.dependencies]
+# 跟 ADR-416 §3.1 一致, 沿用 PoC-0.2 双审 R2 P1 pin (版本钉死).
+# PR2-4-b recon: feature 从 bundled-sqlcipher-vendored-openssl 改 bundled — alpha L1 不加密
+# (L1-schema §3.4 line 466 / ADR-029 R5), sqlcipher-vendored-openssl 需 Strawberry Perl 编不过且 alpha 用不上;
+# sqlcipher 推到真做 L1 加密时恢复 (ADR-416 §3.1 已注). 普通 bundled sqlite 用 MSVC 编, 无 Perl 依赖.
+rusqlite = { version = "=0.32.1", features = ["bundled", "hooks", "limits"] }
+reqwest = { version = "0.12", features = ["blocking", "json"], default-features = false }
+# PR2-2-d sidecar spawn: 随机 token 生成 (sidecar 鉴权, 32 字符).
+rand = "0.8"
+# PR2-4-d config: config.toml 解析 (纯 Rust, 无 C/openssl).
+toml = "0.8"
+# PR2-4-e config 校验: ADR-403 §3.4 TD3 (serde + validator); 0.18 匹配 ADR 骨架 custom(function="..")+nested 语法.
+validator = { version = "0.18", features = ["derive"] }
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",     # R9复审R3: 单写者锁改 OS 独占句柄 (CreateFileW share=0 + DELETE_ON_CLOSE)
+    "Win32_System_Threading",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Memory",
+    "Win32_System_Registry",
+    "Win32_System_LibraryLoader",
+    "Win32_Security",
+    "Win32_Security_Cryptography",  # PR2-1-b: DPAPI CryptProtectData/CryptUnprotectData
+] }
+# ADR-428 M3-a native-keyscan (纯 Rust 扫内存提 key, 替代 vendor wx_key.dll):
+#   goblin 解 Weixin.dll PE 提 internal_db_key 常量 (full 路, 静态读不运行 dll);
+#   regex bytes 扫内存 x'<hex>' enc_key + dll 机器码 pattern; rayon 并行验候选;
+#   pbkdf2+hmac SQLCipher4 首页 HMAC 校验 (sha2 已在上). 版本同 PoC key-scan-poc 实测.
+goblin = "0.8"
+regex = "1"
+pbkdf2 = "0.12"
+hmac = "0.12"
+rayon = "1"
+# ADR-428 M3-b native-sqlcipher (纯 Rust 全页解密 → 内存 image → rusqlite deserialize 读):
+#   aes/cbc 全页 AES-256-CBC 解密 (RustCrypto, 同 pbkdf2/hmac/sha2 一族, 无 C/openssl).
+aes = "0.8"
+cbc = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hex = "0.4"
+base64 = "0.22"          # PR2-8-b: config [cli].auth_password DPAPI 密文 base64 编码 (ADR-403 §3.5)
+sha2 = "0.10"
+zstd = { version = "0.13", default-features = false }  # PR2-12-a: decoder message_content zstd 解压 (微信 4.x)
+# R2/⑧ logs bundle: 日志诊断包打 zip (deflate 走 flate2/miniz_oxide 纯 Rust, 无 C/openssl, 可移植).
+zip = { version = "2", default-features = false, features = ["deflate"] }
+md5 = "0.7"              # PR2-12-f: decoder source_native_id 复合 md5 锚点合成 (raw-payload §4 注 r3 P0-B); 纯 Rust, 无 C/openssl, 跟 zstd/base64 同款良性 dep
+zeroize = { version = "1.8", features = ["derive", "alloc", "std"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+clap = { version = "4", features = ["derive"] }
+# ③ HTTP 皮 (serve/REST): axum web 框架 (tower/hyper 生态, 中间件/SSE/Range 现成; hyper 1.x 已在树里=增量小)。
+axum = "0.7"
+tower-http = { version = "0.6", features = ["cors", "trace", "fs"] }
+# ③ /events SSE: async-stream 建事件流 (纯 Rust proc-macro, axum SSE 惯用; 无 C 依赖, 可移植)。
+async-stream = "0.3"
+# async runtime + trait — PR2-1-a (key_provider 起步).
+# tokio features 收敛到最小集 (r2 P1): macros/rt 单线程足够 trait 单测.
+# PR2-1-b/c (cache + ciphertalk) 各自 crate Cargo.toml 按需扩 fs/time/sync/rt-multi-thread.
+async-trait = "0.1"
+tokio = { version = "1", features = ["macros", "rt"] }
+# PR2-1-b: cache 落盘序列化 — 锁 1.3.x (2.x 字节流不兼容 PoC-1 keys.enc)
+bincode = "=1.3.3"
+# PR2-1-b 单测临时目录
+tempfile = "3.10"
+# xtask 新增 (跟 ADR-417 §3 codegen 实施)
+syn = { version = "2", features = ["full", "extra-traits"] }
+quote = "1"
+walkdir = "2"
+serde_yaml = "0.9"
+
+# workspace 级 lint 策略 (alpha 不卷, 0.2.0+ 收紧)
+[workspace.lints.rust]
+unused_imports = "warn"
+unsafe_code = "warn"          # r2 P1: PR2-1-b/c DPAPI FFI 必须 unsafe (ReadProcessMemory / libloading);
+                              # mod 顶部加 #[allow(unsafe_code)] 显式标 + 注释解释 + 限 mod 边界. 0.2.0+ 收紧回 deny.
+missing_docs = "allow"        # alpha 不卷文档, 0.2.0+ 收紧
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# alpha 阶段豁免 (0.2.0+ 收紧). 见 ADR-408 §3 alpha 风格白名单.
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+must_use_candidate = "allow"            # 大量内部函数, alpha 不卷
+doc_markdown = "allow"                  # 中文文档 + ADR-XXX 大量误判
+doc_overindented_list_items = "allow"
+manual_repeat_n = "allow"               # 测试里 [0xaa; 32] 比 repeat_n 更直接
+manual_str_repeat = "allow"             # "a".repeat(64) 在测试里更可读
+# PR2-1-b cache.rs 引入: DPAPI FFI + bincode + 时间转换大量 pedantic 误判. alpha 不卷.
+cast_possible_truncation = "allow"      # u64→u32 / i64→u64 转换 (cache 字段)
+cast_possible_wrap = "allow"            # u64→i64 (Unix epoch)
+ptr_as_ptr = "allow"                    # DPAPI FFI Win32 *mut u8 cast
+ptr_cast_constness = "allow"            # 同上
+borrow_as_ptr = "allow"                 # DPAPI input.as_ptr() as *mut
+return_self_not_must_use = "allow"      # builder pattern with_X
+map_unwrap_or = "allow"                 # .map(...).unwrap_or(...) 比 .map_or 更可读 (cache)
+explicit_into_iter_loop = "allow"       # cache.entries.into_iter() 显式
+unnecessary_mut_passed = "allow"        # input/output blob 必须 &mut
+uninlined_format_args = "allow"         # tracing 内 %sha8 inline 更慢, 显式格式更稳
+# PR2-1-c ciphertalk 引入: libloading FFI + 大量 tokio spawn_blocking + 长函数, alpha 不卷.
+ref_as_ptr = "allow"                    # FFI buffer.as_mut_ptr() as *mut u8
+too_many_lines = "allow"                # ciphertalk resolve() 200+ 行流程编排
+unnecessary_wraps = "allow"             # PoC-1 Result 包装方便链式 ?-传播
+single_match_else = "allow"             # match Ok/Err 比 if let 更对称
+useless_conversion = "allow"            # PoC-1 .into() 兼容 anyhow 桥接残留
+# R9 复审R2 clippy 收口 (alpha 不卷; 0.2.0+ 逐条收紧). 见 ADR-408 §3 白名单。
+similar_names = "allow"                 # l1/li · sha/sha8 等短名成对, 语境清晰; 重命名反损可读
+needless_pass_by_value = "allow"        # 小 Copy/移动值传参 (错误构造等), 改 &T 收益微
+cast_precision_loss = "allow"           # 统计 i64→f64 (计数/占比, 52 位尾数足够)
+cast_sign_loss = "allow"                # i64→usize (已保证非负的行数/索引)
+doc_lazy_continuation = "allow"         # 中文文档续行列表不强制缩进 (同 doc_overindented)
+manual_let_else = "allow"               # match Some/None 比 let else 可读
+redundant_else = "allow"                # 显式 else 比省略更可读
+duration_suboptimal_units = "allow"     # Duration::from_millis(100) 比 from_nanos 直观
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+# r4 P1: panic=abort 防 destructor 解栈泄露 master_key/wxid 副本 (K-R4 红线).
+# 副作用: panic 不可恢复, 但 native-cli 进程级 panic 直接退出符合安全期望.
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true
+# r4: dev 也 panic=abort 保持单测验证语义一致 (panic 单测仍可用 catch_unwind 假设, 但本仓单测无 panic 测).
+panic = "abort"

@@ -1,0 +1,17 @@
+[package]
+name = "native-silk"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+# native-silk — 微信语音 SILK v3 解码 (件 1)。
+# vendored Skype SILK SDK C 源码 (silk/), cc 编译静态链接 + 手写 FFI (无 bindgen → 免 libclang)。
+# 运行期零新增依赖 (C 静态进 lib); 编译期只需 MSVC (项目 rusqlite bundled 已依赖)。来源见 silk/VENDOR.md。
+
+[dependencies]
+thiserror.workspace = true
+
+[build-dependencies]
+cc = "1"

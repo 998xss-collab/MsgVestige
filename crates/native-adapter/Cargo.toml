@@ -1,0 +1,40 @@
+[package]
+name = "native-adapter"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+description = "alpha raw_payload emit binary — 跟 ADR-405 §3.1 EventEmitter trait + ADR-412 字段集 联动"
+keywords = ["wechat", "weixin", "adapter", "native"]
+categories = ["api-bindings"]
+
+[lib]
+name = "native_adapter"
+path = "src/lib.rs"
+
+[[bin]]
+name = "msgvestige-adapter"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+native-core = { path = "../native-core" }
+common = { path = "../common" }
+# IngestError::Storage 透传 native_core::storage::open 的 rusqlite::Error (L1 输出库). bundled 已在图里.
+rusqlite.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+# cli args (ingest 子命令薄壳).
+clap = { workspace = true }
+# async main + run_message_ingest (await DbSource.drain via pipeline).
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
+tempfile.workspace = true
+async-trait.workspace = true

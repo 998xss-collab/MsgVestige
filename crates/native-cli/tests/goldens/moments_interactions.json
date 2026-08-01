@@ -1,0 +1,18 @@
+{
+  "data": [
+    {
+      "content": "好看",
+      "create_time": 1700000400,
+      "from_nickname": "阿波",
+      "from_user": "wxid_bob",
+      "kind": "comment"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 30,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 1
+  }
+}

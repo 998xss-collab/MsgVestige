@@ -1,0 +1,27 @@
+{
+  "data": [
+    {
+      "data_desc": "内容A",
+      "data_title": "标题A",
+      "data_type": "1",
+      "seq": 0,
+      "source_name": "张三",
+      "type_label": "文本"
+    },
+    {
+      "data_desc": "图片B",
+      "data_title": "标题B",
+      "data_type": "2",
+      "seq": 1,
+      "source_name": "张三",
+      "type_label": "图片"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 20,
+    "offset": 0,
+    "source": "cold",
+    "total_count": 2
+  }
+}

@@ -1,0 +1,1 @@
+#1 message/create  msg  Msg_1:1  {"conv_id":"chatA","msg_type":1}
