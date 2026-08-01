@@ -2,7 +2,7 @@
   "data": [
     {
       "conv_id": "gh_news",
-      "datetime": "2023-11-15 06:13:20",
+      "datetime": "<TS>",
       "last_create_time": 1700000000000,
       "last_sender_wxid": "gh_news",
       "msg_type_name": "文本",
@@ -10,7 +10,7 @@
     },
     {
       "conv_id": "chatC",
-      "datetime": "1970-01-01 08:00:02",
+      "datetime": "<TS>",
       "last_create_time": 2100,
       "last_sender_wxid": "wxid_replier",
       "msg_type_name": "文本",
@@ -18,7 +18,7 @@
     },
     {
       "conv_id": "g@chatroom",
-      "datetime": "1970-01-01 08:00:01",
+      "datetime": "<TS>",
       "last_create_time": 1700,
       "last_sender_wxid": "wxid_sender",
       "msg_type_name": "文本",
@@ -26,7 +26,7 @@
     },
     {
       "conv_id": "chatB",
-      "datetime": "1970-01-01 08:00:01",
+      "datetime": "<TS>",
       "last_create_time": 1600,
       "last_sender_wxid": "wxid_bob",
       "msg_type_name": "文本",

@@ -3,7 +3,7 @@
     {
       "conv_id": "chatA",
       "create_time": 1000,
-      "date": "1970-01-01",
+      "date": "<DATE>",
       "kind": "链接",
       "sender_wxid": "wxid_alice",
       "value": "https://example.com/a"

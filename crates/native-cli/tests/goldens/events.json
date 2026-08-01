@@ -3,7 +3,7 @@
     {
       "conv_id": "g@chatroom",
       "create_time": 3000,
-      "date": "1970-01-01",
+      "date": "<DATE>",
       "label": "入群",
       "sys_type": "member_join",
       "text": "\"甲\"邀请\"乙\"加入了群聊"

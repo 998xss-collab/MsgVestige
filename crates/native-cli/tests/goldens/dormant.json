@@ -2,27 +2,27 @@
   "data": [
     {
       "conv_id": "chatB",
-      "last_message_day": "1970-01-01",
+      "last_message_day": "<DATE>",
       "message_count": 2
     },
     {
       "conv_id": "chatA",
-      "last_message_day": "1970-01-01",
+      "last_message_day": "<DATE>",
       "message_count": 7
     },
     {
       "conv_id": "chatC",
-      "last_message_day": "1970-01-01",
+      "last_message_day": "<DATE>",
       "message_count": 1
     },
     {
       "conv_id": "g@chatroom",
-      "last_message_day": "1970-01-01",
+      "last_message_day": "<DATE>",
       "message_count": 3
     },
     {
       "conv_id": "gh_news",
-      "last_message_day": "2023-11-15",
+      "last_message_day": "<DATE>",
       "message_count": 1
     }
   ],

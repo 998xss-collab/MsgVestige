@@ -3,7 +3,7 @@
     {
       "conv_id": "chatA",
       "create_time": 1000,
-      "datetime": "1970-01-01 08:00:01",
+      "datetime": "<TS>",
       "msg_type_name": "文本",
       "sender_wxid": "wxid_alice",
       "text_content": "看 https://example.com/a 联系13800138000 身份证110101199003070011"
@@ -11,7 +11,7 @@
     {
       "conv_id": "chatA",
       "create_time": 2000,
-      "datetime": "1970-01-01 08:00:02",
+      "datetime": "<TS>",
       "msg_type_name": "文本",
       "sender_wxid": "acc",
       "text_content": "好的收到"
@@ -19,7 +19,7 @@
     {
       "conv_id": "chatB",
       "create_time": 1500,
-      "datetime": "1970-01-01 08:00:01",
+      "datetime": "<TS>",
       "msg_type_name": "文本",
       "sender_wxid": "wxid_bob",
       "text_content": "在吗"
@@ -27,7 +27,7 @@
     {
       "conv_id": "gh_news",
       "create_time": 1700000000000,
-      "datetime": "2023-11-15 06:13:20",
+      "datetime": "<TS>",
       "msg_type_name": "文本",
       "sender_wxid": "gh_news",
       "text_content": "<xml appmsg>"
@@ -35,7 +35,7 @@
     {
       "conv_id": "g@chatroom",
       "create_time": 3000,
-      "datetime": "1970-01-01 08:00:03",
+      "datetime": "<TS>",
       "msg_type_name": "SYSTEM",
       "sender_wxid": "sysmsg",
       "text_content": "\"甲\"邀请\"乙\"加入了群聊"
@@ -43,7 +43,7 @@
     {
       "conv_id": "chatA",
       "create_time": 1100,
-      "datetime": "1970-01-01 08:00:01",
+      "datetime": "<TS>",
       "msg_type_name": "文本",
       "sender_wxid": "wxid_alice",
       "text_content": "[位置]"
@@ -51,7 +51,7 @@
     {
       "conv_id": "chatA",
       "create_time": 1200,
-      "datetime": "1970-01-01 08:00:01",
+      "datetime": "<TS>",
       "msg_type_name": "文本",
       "sender_wxid": "wxid_alice",
       "text_content": "[名片]"
@@ -59,7 +59,7 @@
     {
       "conv_id": "chatA",
       "create_time": 1300,
-      "datetime": "1970-01-01 08:00:01",
+      "datetime": "<TS>",
       "msg_type_name": "图片",
       "sender_wxid": "wxid_alice",
       "text_content": "[图片]"
@@ -67,7 +67,7 @@
     {
       "conv_id": "g@chatroom",
       "create_time": 1400,
-      "datetime": "1970-01-01 08:00:01",
+      "datetime": "<TS>",
       "msg_type_name": "文本",
       "sender_wxid": "wxid_alice",
       "text_content": "[红包领取]"
@@ -75,7 +75,7 @@
     {
       "conv_id": "chatB",
       "create_time": 1600,
-      "datetime": "1970-01-01 08:00:01",
+      "datetime": "<TS>",
       "msg_type_name": "文本",
       "sender_wxid": "wxid_bob",
       "text_content": ""
@@ -83,7 +83,7 @@
     {
       "conv_id": "g@chatroom",
       "create_time": 1700,
-      "datetime": "1970-01-01 08:00:01",
+      "datetime": "<TS>",
       "msg_type_name": "文本",
       "sender_wxid": "wxid_sender",
       "text_content": "@张三 在吗"
@@ -91,7 +91,7 @@
     {
       "conv_id": "chatA",
       "create_time": 1800,
-      "datetime": "1970-01-01 08:00:01",
+      "datetime": "<TS>",
       "msg_type_name": "文本",
       "sender_wxid": "wxid_alice",
       "text_content": "看链接"
@@ -99,7 +99,7 @@
     {
       "conv_id": "chatA",
       "create_time": 1900,
-      "datetime": "1970-01-01 08:00:01",
+      "datetime": "<TS>",
       "msg_type_name": "文本",
       "sender_wxid": "wxid_alice",
       "text_content": "文件"
@@ -107,7 +107,7 @@
     {
       "conv_id": "chatC",
       "create_time": 2100,
-      "datetime": "1970-01-01 08:00:02",
+      "datetime": "<TS>",
       "msg_type_name": "文本",
       "sender_wxid": "wxid_replier",
       "text_content": "<xml appmsg>"

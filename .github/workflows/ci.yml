@@ -52,7 +52,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # ⚠️ **不挂 macOS**(首次上 GitHub、CI 第一次真跑逮到): native-core 里有一道
+        # 故意的 `compile_error!` —— 它依赖的 wx_key.dll / wcdb_api.dll 只有 x86_64 版,
+        # 所以非 x64 直接拒绝编译。而 GitHub 的 macos-latest 现在全是 ARM(aarch64),
+        # 一编译就撞上那道拒绝。这本来就是个只读 Windows 微信数据的工具, macOS 跑不出
+        # 任何有意义的结论。(想验 x64 macOS 可以钉 macos-13, 但那批机器也在退役, 不值当。)
+        #
+        # **Linux 保留**: 它编得过, 留着能挡住"不小心写进 Windows 专属 API"——
+        # 下面第 33 行那条注释记的就是历史上真栽过的那次。
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

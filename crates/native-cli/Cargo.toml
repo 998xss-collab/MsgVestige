@@ -59,6 +59,9 @@ toml = { workspace = true }
 
 [dev-dependencies]
 async-trait = { workspace = true }
+# golden_json 归一时间戳用 (CI 跨时区): 二进制 crate 无 lib target, 集成测试只能走 dev-deps,
+# 主依赖里那份 regex 它够不着。
+regex = { workspace = true }
 # R2/⑧ logs_bundle 单测: 临时目录造假日志/config 验打包 + 脱敏。
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }

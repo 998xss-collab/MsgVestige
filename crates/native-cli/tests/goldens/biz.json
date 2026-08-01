@@ -2,7 +2,7 @@
   "data": [
     {
       "create_time": 1700000000000,
-      "date": "2023-11-15",
+      "date": "<DATE>",
       "gh_id": "gh_news",
       "msg_type": 1,
       "title": "公众号文章标题"

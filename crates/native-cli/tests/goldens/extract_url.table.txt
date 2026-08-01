@@ -1,1 +1,1 @@
-[1970-01-01] chatA  wxid_alice  https://example.com/a
+[<DATE>] chatA  wxid_alice  https://example.com/a

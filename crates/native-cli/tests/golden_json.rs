@@ -831,6 +831,43 @@ fn normalize(v: &mut serde_json::Value) {
             meta.insert("next_cursor".to_string(), serde_json::json!("<CURSOR>"));
         }
     }
+    // ⚠️ 时间戳同 `normalize_table` 那条: 产品有意用 SQLite `localtime` 出时间, golden 会跟着
+    // 生成机器的时区走。**json 这侧也得归一** —— 第一版我只改了 table 那个函数, 而
+    // followups.json / new.json 里同样躺着 `1970-01-01 08:00:01` 这种本地时间, CI 照样红。
+    // 又是"只改了被点名那处"。这里递归扫所有字符串值。
+    normalize_ts_in_place(v);
+}
+
+/// 时区相关的日期时间形态 —— **两种都要盖**:
+/// - `YYYY-MM-DD HH:MM:SS`(`datetime(...,'localtime')`)→ `<TS>`
+/// - `YYYY-MM-DD`(`date(...,'localtime')`, 如 dormant 的 `last_message_day`)→ `<DATE>`
+///
+/// ⚠️ **只写第一种会漏**: 我第一版正则要求带时分秒, 跑反例(`TZ=UTC`)当场红 ——
+/// `last_message_day` 东八区是 `2023-11-15`、UTC 是 `2023-11-14`, **跨时区差一天**,
+/// 而它压根没有时分秒。判据又是"只写了我眼前那一种写法"。
+/// 先换长的再换短的, 否则短的会把长的前半截先吃掉。
+fn ts_regexes() -> (regex::Regex, regex::Regex) {
+    (
+        regex::Regex::new(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}").expect("常量正则"),
+        regex::Regex::new(r"\d{4}-\d{2}-\d{2}").expect("常量正则"),
+    )
+}
+
+/// 递归把 JSON 里所有字符串值中的日期时间换成占位。
+fn normalize_ts_in_place(v: &mut serde_json::Value) {
+    match v {
+        serde_json::Value::String(s) => {
+            let (long, short) = ts_regexes();
+            let t = long.replace_all(s, "<TS>").into_owned();
+            let t = short.replace_all(&t, "<DATE>").into_owned();
+            if &t != s {
+                *s = t;
+            }
+        }
+        serde_json::Value::Array(a) => a.iter_mut().for_each(normalize_ts_in_place),
+        serde_json::Value::Object(o) => o.values_mut().for_each(normalize_ts_in_place),
+        _ => {}
+    }
 }
 
 fn goldens_dir() -> PathBuf {
@@ -865,8 +902,25 @@ fn run_cmd(l1_db: &str, args: &[&str]) -> serde_json::Value {
 /// table 文本易变字段规整: fixture L1 路径 (进程/纳秒后缀, 跨运行变) → 占位; CRLF → LF
 /// (autocrlf=true 下 golden 若被签出成 CRLF, 逐字节比不受影响)。cursor/account 在 table 模式走
 /// **stderr** (`eprintln!` 表头 / `下一页: --cursor`), stdout 只有数据行 → 无游标/账号泄漏。
+///
+/// ⚠️ **时间戳要归一, 否则这个 golden 跟着跑机的时区走**(首次上 GitHub、CI 第一次真跑逮到):
+/// 产品**有意**用 SQLite 的 `localtime` 出时间(见 `live_query.rs` 那句"必须用 SQLite 算, 不能用
+/// Rust" —— 给用户看本地时间是对的, 冷热两路也靠它对齐口径)。于是同一份 fixture 在东八区跑出
+/// `[1970-01-01 08:00:01]`, 在 UTC 的 CI 上跑出 `[1970-01-01 00:00:01]` —— golden 是在我机器上
+/// 生成的, CI 必红, 而本地永远发现不了。
+///
+/// **不改产品**(时区相关是它该有的行为), 改这里: 这个 golden 守的是**信封漂移**(有哪些列、
+/// 顺序、格式), 不是时间戳数值。把 `YYYY-MM-DD HH:MM:SS` 整体换成占位 —— 日期时间的**形状**
+/// 照样守得住(少一列、格式变了仍然会红), 只是不再钉死在某个时区。
+///
+/// 也考虑过在 CI 里设 `TZ=Asia/Shanghai`: 不行 —— Windows 上 SQLite 的 `localtime` 读的是
+/// 操作系统时区, 不认 `TZ` 环境变量, 那样 Linux 绿了 Windows 照样红。
 fn normalize_table(s: &str, l1_db: &str) -> String {
-    s.replace("\r\n", "\n").replace(l1_db, "<L1DB>")
+    let s = s.replace("\r\n", "\n").replace(l1_db, "<L1DB>");
+    // 两种形态都要盖 (见 `ts_regexes` 上的说明: 只带日期的字段跨时区会差一天)。
+    let (long, short) = ts_regexes();
+    let t = long.replace_all(&s, "<TS>").into_owned();
+    short.replace_all(&t, "<DATE>").into_owned()
 }
 
 /// 跑一条命令的 `--format table`, 返规整后的 **stdout** 文本 (数据行; 表头/游标提示在 stderr, 不入 golden)。
