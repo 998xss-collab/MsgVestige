@@ -23,6 +23,11 @@ SQLite 库，然后你可以用命令行查、用 SQL 查、或者让 AI 助手�
 | `msgvestige-wechat-*-windows-x64-slim.zip` | ~9 MB | 主程序，日常够用 |
 | `msgvestige-wechat-*-windows-x64-full.zip` | ~117 MB | 多带 ffmpeg 和 node —— 导语音成 mp3、导朋友圈图片视频要它俩 |
 
+> **两个包的来路不一样，说清楚**：精简版由 GitHub Actions 自动构建；完整版里的 ffmpeg（195 MB）
+> 和 node 太大、不进代码仓库，所以是在本机用仓库里的 `scripts/package-local.ps1` 打的 ——
+> 两者用的是**同一个提交**的代码（跑 `--version` 能看到同一个哈希）。想自己复现完整版：
+> 把 ffmpeg.exe / ffprobe.exe 放进 `vendor/ffmpeg/`、node.exe 放进 `vendor/`，再跑那个脚本加 `-Full`。
+
 **Windows 会拦一下。** 这个程序没有代码签名（证书一年好几千，alpha 阶段不值当），下载后首次运行会
 弹 SmartScreen 提示。点「更多信息」→「仍要运行」即可。介意的话可以自己从源码编译。
 

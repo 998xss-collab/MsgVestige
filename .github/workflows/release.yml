@@ -34,7 +34,7 @@ jobs:
         shell: pwsh
         run: |
           $ver = if ($env:GITHUB_REF -like 'refs/tags/*') { $env:GITHUB_REF -replace '^refs/tags/','' } else { 'dev' }
-          $stage = "dist/msgvestige-wechat-$ver-windows-x64"
+          $stage = "dist/msgvestige-wechat-$ver-windows-x64-slim"
           New-Item -ItemType Directory -Force $stage | Out-Null
           Copy-Item target/release/msgvestige.exe     $stage/
           Copy-Item target/release/msgvestige-adapter.exe $stage/
@@ -78,8 +78,8 @@ jobs:
 
           .\msgvestige.exe --version
           "@ | Set-Content -Encoding UTF8 "$stage/包内清单.md"
-          Compress-Archive -Path "$stage/*" -DestinationPath "dist/msgvestige-wechat-$ver-windows-x64.zip"
-          "ASSET=dist/msgvestige-wechat-$ver-windows-x64.zip" | Out-File -Append $env:GITHUB_ENV
+          Compress-Archive -Path "$stage/*" -DestinationPath "dist/msgvestige-wechat-$ver-windows-x64-slim.zip"
+          "ASSET=dist/msgvestige-wechat-$ver-windows-x64-slim.zip" | Out-File -Append $env:GITHUB_ENV
 
       # **在解包后的目录里真跑一次** —— 只验"workflow 绿了"等于 CI 自己说自己好。
       # 这一步跑的是**压缩包解出来的那个 exe**, 不是 target/release 里的, 且换到临时目录跑,
